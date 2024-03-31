@@ -12,11 +12,13 @@ License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
 
 """
-
 # Import necessary modules
+
+import os
+
 import numpy as np
 import scipy
-import os
+
 
 def norm(X):
     """
@@ -59,10 +61,29 @@ def stand(X):
     return (X - mu) / (sigma + 1e-20)
 
 def CreateSaveFolder(file_path):
-    # 检查目录是否存在
+    """
+    Checks if a directory exists at the specified file path and creates it if it doesn't exist.
+
+    Parameters:
+    ----------
+    - file_path : str
+        The path of the directory to be created.
+
+    Returns:
+    ----------
+    - None
+
+    """
+    # Check if the directory exists
     if not os.path.exists(file_path):
-        # 创建目录
+        # Create the directory
         os.makedirs(file_path)
-        print(f"目录 {file_path} 创建成功")
+        print(f"Directory {file_path} created successfully.")
     else:
-        print(f"目录 {file_path} 已存在")
+        print(f"Directory {file_path} already exists.")
+
+def RoundFloat(X):
+    if isinstance(X, float):
+        return round(X, 6)
+    else:
+        return X
