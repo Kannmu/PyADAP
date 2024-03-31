@@ -1,2 +1,2 @@
 # PyADA
-Python Automated Data Analysis Module
+Python Automated Data Analysis Pipeline
