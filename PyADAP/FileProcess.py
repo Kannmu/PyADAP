@@ -13,11 +13,20 @@ Repository: https://github.com/Kannmu/PyADAP
 
 """
 
+import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 
-def ExcelFormAdj(FilePath):
+def SaveDataToExcel(FilePath:str = "./Default.xlsx",Statistics:pd.DataFrame=pd.DataFrame() ,Normality: pd.DataFrame=pd.DataFrame(),Sphericity: pd.DataFrame=pd.DataFrame()):
+    with pd.ExcelWriter(FilePath, engine="xlsxwriter") as writer:
+        Statistics.to_excel(writer, sheet_name="StatisticsResults", index=False)
+        Normality.to_excel(writer, sheet_name='NormalTestResults', index=False)
+        Sphericity.to_excel(writer, sheet_name='SphericityTestResults', index=False)
+    ExcelPostAdj(FilePath)
+
+
+def ExcelPostAdj(FilePath):
     # 加载Excel文件
     wb = load_workbook(FilePath)
 

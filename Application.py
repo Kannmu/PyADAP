@@ -51,5 +51,5 @@ pap.Pipeline(
     DataPath=DataPath, 
     Clean=False, 
     IndependentVars=["BC","BS"], 
-    DependentVars = ["Time"]
+    DependentVars = ["Time","Speed"]
 )
