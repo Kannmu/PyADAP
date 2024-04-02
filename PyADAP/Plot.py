@@ -18,8 +18,10 @@ import pandas as pd
 import seaborn as sns
 from scipy import stats
 
+import PyADAP.Data as data
 
-def BoxPlots(data: pd.DataFrame, SavePath: str = "", Split: bool = False):
+
+def BoxPlots(DataInstance: data.Data, SavePath: str = "", Split: bool = False):
     # Untested!!!!!!!!!!!!
     """
     Plots box plots for all the numerical columns in the provided DataFrame.
@@ -40,24 +42,27 @@ def BoxPlots(data: pd.DataFrame, SavePath: str = "", Split: bool = False):
     - None, but saves a plot or plots containing box plots for all the numerical columns.
     """
 
-    numeric_cols = data.select_dtypes(include=np.number).columns.tolist()
+    # numeric_cols = data.select_dtypes(include=np.number).columns.tolist()
+    numeric_cols = DataInstance.RawData.columns.tolist()
 
     if Split:
         for col in numeric_cols:
             plt.figure(figsize=(8, 6))
-            sns.boxplot(x=data[col])
+            sns.boxplot(y=DataInstance.RawData[col])
             plt.title(f'Box plot of {col}')
-            plt.savefig(f"{SavePath}/{col}_boxplot.png", dpi=200)
+            plt.savefig(f"{SavePath}\\{col}_boxplot.png", dpi=200)
             plt.close()  # Close the figure to avoid displaying it in the notebook
     else:
         plt.figure(figsize=(len(numeric_cols) * 5, 8))
-        sns.boxplot(data=data[numeric_cols])
+        sns.boxplot(data=DataInstance.RawData[numeric_cols])
         plt.xticks(rotation=45)
         plt.title('Box plot of all variables')
         plt.tight_layout()
-        plt.savefig(SavePath, dpi=200)
+        plt.savefig(SavePath +"\\Box-Plots.png", dpi=200)
 
-def QQPlots(data: pd.DataFrame, SavePath: str = ""):
+
+
+def QQPlots(DataInstance: data.Data, SavePath: str = ""):
     """
     Plots QQ-plots for all the numerical columns in the provided DataFrame.
 
@@ -74,7 +79,8 @@ def QQPlots(data: pd.DataFrame, SavePath: str = ""):
     """
 
     # Determine the numeric columns in the data
-    numeric_cols = data.iloc[:,1:].select_dtypes(include=np.number).columns.tolist()
+    # numeric_cols = data.iloc[:,1:].select_dtypes(include=np.number).columns.tolist()
+    numeric_cols = DataInstance.RawData.columns.tolist()
 
     # Calculate the number of rows and columns for the plots, trying to make them as square as possible
     n = len(numeric_cols)
@@ -90,7 +96,7 @@ def QQPlots(data: pd.DataFrame, SavePath: str = ""):
 
     # For each numeric column, plot the QQ-plot
     for col, ax in zip(numeric_cols, axes.flatten()):
-        stats.probplot(data[col].dropna(), dist="norm", plot=ax)
+        stats.probplot(DataInstance.RawData[col].dropna(), dist="norm", plot=ax)
         ax.set_title(f"QQ-plot of {col}")
 
     # If the number of subplots is less than the number of numeric columns, hide the excess subplots

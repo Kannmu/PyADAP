@@ -22,34 +22,17 @@ def SelectDataFile():
     return DataPath
 
 
-def LoadData(DataPath: str):
-    if DataPath.endswith(".xlsx") or DataPath.endswith(".xls"):
-        # 读取Excel文件
-        RawDataFrame = pd.read_excel(DataPath)
-    elif DataPath.endswith(".csv"):
-        # 读取CSV文件
-        RawDataFrame = pd.read_csv(DataPath)
-    else:
-        # 文件类型不支持
-        raise ValueError("Unsupported file format")
-
-    return RawDataFrame
-
-
 DataPath = SelectDataFile()
 
 # print("DataPath:", DataPath + "\n")
 
 pap.utility.CreateSaveFolder(os.path.dirname(DataPath) + "\\Results")
 
-RawData = LoadData(DataPath)
-
-# print(RawData)
+# Construct Data Instance
+Data = pap.data.Data(
+    DataPath, IndependentVars=["BC", "BS"], DependentVars=["Time", "Speed"], Clean=False
+)
 
 pap.Pipeline(
-    RawData, 
-    DataPath=DataPath, 
-    Clean=False, 
-    IndependentVars=["BC","BS"], 
-    DependentVars = ["Time","Speed"]
+    Data=Data,
 )

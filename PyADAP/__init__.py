@@ -42,38 +42,42 @@ import os
 
 import pandas as pd
 
-import PyADAP.Clean as clean
-import PyADAP.FileProcess as fp
+import PyADAP.Data as data
+import PyADAP.File as file
 import PyADAP.Plot as plt
 import PyADAP.Statistic as statistic
 import PyADAP.Utilities as utility
 
 
 def Pipeline(
-    data: pd.DataFrame,
-    DataPath: str = "",
-    Clean: bool = False,
-    IndependentVars: list = [],
-    DependentVars: list = [],
+    Data: data.Data,
 ):
 
-    DataFileName, _ = os.path.splitext(os.path.basename(DataPath))
+    StatisticsResults = statistic.statistics(Data)
 
-    if Clean:
-        data = clean.clean_numeric_columns(data)
-        data = clean.clean_string_columns(data)
-
-    StatisticsResults = statistic.statistics(data,IndependentVars = IndependentVars, DependentVars=DependentVars)
-
-    NormalTestResults = statistic.normality_test(data,IndependentVars = IndependentVars, DependentVars=DependentVars)
-
-    plt.QQPlots(data, os.path.dirname(DataPath) + "\\Results" + "\\QQ-Plots.png")
-
-    SphericityTestResults = statistic.sphericity_test(data, IndependentVars = IndependentVars, DependentVars=DependentVars)
-
-    ResultsFilePath = (
-        os.path.dirname(DataPath) + "\\Results" + "\\" + DataFileName + "Results.xlsx"
+    plt.BoxPlots(
+        Data,
+        os.path.dirname(Data.DataPath) + "\\Results",
+        Split=True,
     )
 
-    fp.SaveDataToExcel(ResultsFilePath, StatisticsResults, NormalTestResults, SphericityTestResults)
+    NormalTestResults = statistic.normality_test(Data)
 
+    plt.QQPlots(
+        Data,
+        os.path.dirname(Data.DataPath) + "\\Results" + "\\QQ-Plots.png",
+    )
+
+    SphericityTestResults = statistic.sphericity_test(Data)
+
+    ResultsFilePath = (
+        os.path.dirname(Data.DataPath)
+        + "\\Results"
+        + "\\"
+        + Data.DataFileName
+        + "Results.xlsx"
+    )
+
+    file.SaveDataToExcel(
+        ResultsFilePath, StatisticsResults, NormalTestResults, SphericityTestResults
+    )
