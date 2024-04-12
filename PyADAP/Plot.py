@@ -21,7 +21,20 @@ from scipy import stats
 import PyADAP.Data as data
 
 
-def BoxPlots(DataInstance: data.Data, SavePath: str = "", Split: bool = False):
+def ResidualPlots(DataInstance:data.Data):
+    """
+    This function calculates and plots residuals of input data
+
+    Parameters:
+    -----------
+    - DataInstance: data.Data
+        The input Data instance containing the data for which residuals are to be calculated.
+    
+    """
+
+
+
+def BoxPlots(DataInstance:data.Data, SavePath: str = "", Split: bool = False):
     # Untested!!!!!!!!!!!!
     """
     Plots box plots for all the numerical columns in the provided DataFrame.
@@ -42,24 +55,24 @@ def BoxPlots(DataInstance: data.Data, SavePath: str = "", Split: bool = False):
     - None, but saves a plot or plots containing box plots for all the numerical columns.
     """
 
-    # numeric_cols = data.select_dtypes(include=np.number).columns.tolist()
-    numeric_cols = DataInstance.RawData.columns.tolist()
+    for dependentvar in DataInstance.DependentVars:
+        for index, independentvar in enumerate(DataInstance.IndependentVars):
+            IndependentLevels = DataInstance.IndependentLevelsList[index]
+            
+            plt.figure(figsize=(len(IndependentLevels) * 2, 8))
+            
+            Tempdf = DataInstance.RawData
+            Tempdf['index_by_group'] = Tempdf.groupby(independentvar).cumcount()
 
-    if Split:
-        for col in numeric_cols:
-            plt.figure(figsize=(8, 6))
-            sns.boxplot(y=DataInstance.RawData[col])
-            plt.title(f'Box plot of {col}')
-            plt.savefig(f"{SavePath}\\{col}_boxplot.png", dpi=200)
-            plt.close()  # Close the figure to avoid displaying it in the notebook
-    else:
-        plt.figure(figsize=(len(numeric_cols) * 5, 8))
-        sns.boxplot(data=DataInstance.RawData[numeric_cols])
-        plt.xticks(rotation=45)
-        plt.title('Box plot of all variables')
-        plt.tight_layout()
-        plt.savefig(SavePath +"\\Box-Plots.png", dpi=200)
+            # 使用pivot_table来重塑DataFrame
+            result_df = Tempdf.pivot_table(index='index_by_group', columns=independentvar, values=dependentvar, aggfunc='first').reset_index(drop=True)
 
+            sns.boxplot(data=result_df)
+
+            # plt.xticks(rotation=45)
+            plt.title('Box plot of '+ independentvar)
+            plt.tight_layout()
+            plt.savefig(SavePath + "\\" +independentvar+  "Box-Plots.png", dpi=200)
 
 
 def QQPlots(DataInstance: data.Data, SavePath: str = ""):

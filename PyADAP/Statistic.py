@@ -31,16 +31,14 @@ import PyADAP.Utilities as utility
 init()
 
 
-def statistics(
-    DataInstance: data.Data
-):
+def statistics(DataInstance: data.Data):
     """
     This function calculates and returns a DataFrame containing various statistical measures for each numerical column in the input DataFrame.
 
     Parameters:
     ----------
-    - data : pd.DataFrame
-        The input DataFrame containing the data for which statistics are to be calculated.
+    - DataInstance : data.Data
+        The input Data instance containing the data for which statistics are to be calculated.
 
     Returns:
     ----------
@@ -56,7 +54,8 @@ def statistics(
     Example Usage:
     --------------
     >>> input_data = pd.DataFrame({'A': [1, 2, 3], 'B': [4, 5, 6]})
-    >>> result = statistics(input_data)
+    >>> data_instance = data.Data(input_data, ['A'], ['B'])
+    >>> result = statistics(data_instance)
     >>> print(result)
         Variable  Mean  Standard Deviation  Kurtosis  Skewness
     0        A   2.0      1.414214    -1.200000   0.000000
@@ -91,7 +90,9 @@ def statistics(
 
             for indelevel in IndependentLevels:
                 # Calculate the mean, standard deviation, kurtosis, and skewness for the column.
-                Tempdata = DataInstance.RawData[DataInstance.RawData[independentvar] == indelevel][dependentvar]
+                Tempdata = DataInstance.RawData[
+                    DataInstance.RawData[independentvar] == indelevel
+                ][dependentvar]
                 statistics = SingleStatistic(
                     Tempdata,
                     independentvar + "->" + str(indelevel) + "-->" + dependentvar,
@@ -99,11 +100,15 @@ def statistics(
                 )
 
         # Interaction Between independent variables different levels
-        for IndependentvarCombination in itertools.product(*DataInstance.IndependentLevelsList):
+        for IndependentvarCombination in itertools.product(
+            *DataInstance.IndependentLevelsList
+        ):
 
             conditions = (
                 DataInstance.RawData[var] == value
-                for var, value in zip(DataInstance.IndependentVars, IndependentvarCombination)
+                for var, value in zip(
+                    DataInstance.IndependentVars, IndependentvarCombination
+                )
             )
             combined_condition = pd.Series(True, index=DataInstance.RawData.index)
             for condition in conditions:
@@ -113,10 +118,14 @@ def statistics(
 
             VariableStrList = [
                 "; " + invar + "->" + str(level)
-                for invar, level in zip(DataInstance.IndependentVars, IndependentvarCombination)
+                for invar, level in zip(
+                    DataInstance.IndependentVars, IndependentvarCombination
+                )
             ]
 
-            VariableStr = (("".join(VariableStrList) + "-->" + dependentvar)[1:]).lstrip()
+            VariableStr = (
+                ("".join(VariableStrList) + "-->" + dependentvar)[1:]
+            ).lstrip()
 
             statistics = SingleStatistic(
                 Tempdata,
@@ -124,6 +133,9 @@ def statistics(
                 statistics,
             )
 
+    # Prepare the PrettyTable object for printing the statistics.
+    StatisticsResultTable.clear()
+    StatisticsResultTable.field_names = statistics_columns
     # Prepare the PrettyTable object for printing the statistics.
     StatisticsResultTable.clear()
     StatisticsResultTable.field_names = statistics_columns
@@ -141,6 +153,7 @@ def statistics(
 
     # Return the DataFrame containing the calculated statistics.
     return statistics
+
 
 def SingleStatistic(Tempdata: pd.DataFrame, VariableStr: str, statistics):
     mean = Tempdata.mean()
@@ -163,9 +176,8 @@ def SingleStatistic(Tempdata: pd.DataFrame, VariableStr: str, statistics):
 
     return statistics
 
-def normality_test(
-    DataInstance: data.Data
-):
+
+def normality_test(DataInstance: data.Data):
     """
     This function performs a normality test on each numeric column of the provided DataFrame to determine if the data follows a normal distribution.
 
@@ -206,8 +218,6 @@ def normality_test(
     The function prints the results in a table format for easy readability and returns the DataFrame for further analysis.
     """
 
-
-
     # Define the column names for the results DataFrame
     ResultsColumns = ["Variable", "Normal", "Method", "Statistic", "p-value"]
 
@@ -229,7 +239,9 @@ def normality_test(
             IndependentLevels = DataInstance.IndependentLevelsList[index]
             for indelevel in IndependentLevels:
 
-                Tempdata = DataInstance.RawData[DataInstance.RawData[independentvar] == indelevel][dependentvar]
+                Tempdata = DataInstance.RawData[
+                    DataInstance.RawData[independentvar] == indelevel
+                ][dependentvar]
                 normality = SingleNormalTest(
                     Tempdata,
                     independentvar + "->" + str(indelevel) + "-->" + dependentvar,
@@ -237,21 +249,25 @@ def normality_test(
                 )
 
         # Interaction Between independent variables different levels
-        for IndependentvarCombination in itertools.product(*DataInstance.IndependentLevelsList):
+        for IndependentvarCombination in itertools.product(
+            *DataInstance.IndependentLevelsList
+        ):
             # print(IndependentvarCombination)
             conditions = (
                 DataInstance.RawData[var] == value
-                for var, value in zip(DataInstance.IndependentVars, IndependentvarCombination)
+                for var, value in zip(
+                    DataInstance.IndependentVars, IndependentvarCombination
+                )
             )
             combined_condition = pd.Series(True, index=DataInstance.RawData.index)
             for condition in conditions:
                 combined_condition &= condition
-
             Tempdata = DataInstance.RawData[combined_condition][dependentvar]
-
             VariableStrList = [
                 "; " + invar + "->" + str(level)
-                for invar, level in zip(DataInstance.IndependentVars, IndependentvarCombination)
+                for invar, level in zip(
+                    DataInstance.IndependentVars, IndependentvarCombination
+                )
             ]
 
             VariableStr = ("".join(VariableStrList) + "-->" + dependentvar)[1:]
@@ -287,11 +303,13 @@ def SingleNormalTest(Tempdata: pd.DataFrame, VariableStr: str, normality: pd.Dat
     elif n < 300:
         Method = "normaltest"
     else:
-        Method = "kstest"
-
+        Method = "jarque_bera"
+    # print(Method)
+    
     # Conduct the normality test using the selected method
-    test_result = pg.normality(Tempdata, method=Method)
+    test_result = pg.normality(Tempdata, method = Method)
 
+    # Prepare the result for output
     TempResult = pd.DataFrame(
         {
             "Variable": [VariableStr],
@@ -307,9 +325,7 @@ def SingleNormalTest(Tempdata: pd.DataFrame, VariableStr: str, normality: pd.Dat
     return normality
 
 
-def sphericity_test(
-    DataInstance:data.Data
-):
+def sphericity_test(DataInstance: data.Data):
     """
     Parameters:
     ----------
@@ -327,17 +343,6 @@ def sphericity_test(
         - p-value: The p-value associated with the test.
         - EPS: The epsilon value used to correct degrees of freedom if sphericity is violated.
     """
-    # if len(Within) <= 2:
-    #     print(Fore.YELLOW + "\n Sphericity assumptions must meet between two variables")
-    #     return pd.DataFrame(
-    #         {
-    #             "Variable": ["Overall"],
-    #             "Sphericity": "True",
-    #             "Statistic": "N/A",
-    #             "p-value": "N/A",
-    #             "EPS": "N/A",
-    #         }
-    #     )
 
     ResultsColumns = ["Variable", "Sphericity", "Statistic", "p-value", "EPS"]
     SphericityResultTable = PrettyTable()
@@ -351,7 +356,10 @@ def sphericity_test(
         for independentvar in DataInstance.IndependentVars:
             # Conduct the sphericity test
             test_result = pg.sphericity(
-                DataInstance.RawData, dv=dependentvar, within=independentvar, subject="Subject"
+                DataInstance.RawData,
+                dv=dependentvar,
+                within=independentvar,
+                subject="Subject",
             )
 
             # Prepare the result for output

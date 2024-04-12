@@ -60,7 +60,7 @@ def stand(X):
     sigma = np.std(X)
     return (X - mu) / (sigma + 1e-20)
 
-def CreateSaveFolder(file_path):
+def CreateFolder(FolderPath):
     """
     Checks if a directory exists at the specified file path and creates it if it doesn't exist.
 
@@ -75,14 +75,29 @@ def CreateSaveFolder(file_path):
 
     """
     # Check if the directory exists
-    if not os.path.exists(file_path):
+    if not os.path.exists(FolderPath):
         # Create the directory
-        os.makedirs(file_path)
-        print(f"Directory {file_path} created successfully.")
+        os.makedirs(FolderPath)
+        print(f"Directory {FolderPath} created successfully.")
     else:
-        print(f"Directory {file_path} already exists.")
+        print(f"Directory {FolderPath} already exists.")
+
 
 def RoundFloat(X):
+    """
+    Round a  float number to 6 decimal places.
+    
+    Parameters
+    ----------
+    X: float
+        Input float number
+    
+    Returns
+    ----------
+    X: float
+        Rounded float number
+    
+    """
     if isinstance(X, float):
         return round(X, 6)
     else:

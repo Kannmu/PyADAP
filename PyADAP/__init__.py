@@ -44,6 +44,7 @@ import pandas as pd
 
 import PyADAP.Data as data
 import PyADAP.File as file
+import PyADAP.GUI as gui
 import PyADAP.Plot as plt
 import PyADAP.Statistic as statistic
 import PyADAP.Utilities as utility
@@ -52,7 +53,14 @@ import PyADAP.Utilities as utility
 def Pipeline(
     Data: data.Data,
 ):
+    """This function performs the entire process of analyzing the data and generates a report on the results.
 
+    Args:
+        Data (data.Data): The data to analyze.
+
+    Returns:
+        pd.DataFrame: The results of the analysis, in a Pandas DataFrame format.
+    """
     StatisticsResults = statistic.statistics(Data)
 
     plt.BoxPlots(

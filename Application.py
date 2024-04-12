@@ -1,38 +1,34 @@
 import os
+import sys
 
 import pandas as pd
-import win32ui
 
 import PyADAP as pap
 
+# sys.exit(0)
 
-def SelectDataFile():
-    # Create a file selection dialog
-    dlg = win32ui.CreateFileDialog(
-        1, ".xlsx;.xls;.csv", None, 0, "Data (*.xlsx;*.xls;*.csv)|*.xlsx;*.xls;*.csv||"
-    )
-
-    # Display the file selection dialog
-    dlg.DoModal()
-
-    # Get the selected file path
-    DataPath = dlg.GetPathName()
-
-    # Return the selected file path
-    return DataPath
-
-
-DataPath = SelectDataFile()
-
-# print("DataPath:", DataPath + "\n")
-
-pap.utility.CreateSaveFolder(os.path.dirname(DataPath) + "\\Results")
+DataPath = pap.file.SelectDataFile()
 
 # Construct Data Instance
-Data = pap.data.Data(
-    DataPath, IndependentVars=["BC", "BS"], DependentVars=["Time", "Speed"], Clean=False
-)
+Data = pap.data.Data(DataPath)
 
-pap.Pipeline(
-    Data=Data,
-)
+Data.LoadData()
+
+# Select Parameters In GUI
+Interface = pap.gui.Interface()
+IndependentVars, DependentVars, IsClean = Interface.ParametersSettingPage(Data.VarsNames.tolist())
+
+# 判断接收到的这两个变量是否为空
+if not IndependentVars or not DependentVars:
+    raise ValueError("IndependentVars or DependentVars cannot be empty.")
+
+Data.SetVars(IndependentVars, DependentVars)
+
+Data.DataCleaning(Clean = IsClean)
+
+# Create Results Folder
+pap.utility.CreateFolder(os.path.dirname(DataPath) + "\\Results")
+
+pap.Pipeline(Data=Data)
+
+

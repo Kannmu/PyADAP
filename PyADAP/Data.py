@@ -23,40 +23,75 @@ class Data:
     def __init__(
         self,
         DataPath: str,
-        IndependentVars: list = [],
-        DependentVars: list = [],
-        Clean: bool = False,
     ) -> None:
+        """
+        Create Data Instance
+        """
         self.DataPath = DataPath
-
-        self.IndependentVars = IndependentVars
-        self.DependentVars = DependentVars
 
         self.DataFileName, self.DataFileType = os.path.splitext(
             os.path.basename(DataPath)
         )
+        
 
-        self.LoadData()
+    def LoadData(self):
+        """
+        Load Data DataFrame
+        """
+        if self.DataPath.endswith(".xlsx") or self.DataPath.endswith(".xls"):
+            # Read the Excel file
+            self.RawData = pd.read_excel(self.DataPath)
+        elif self.DataPath.endswith(".csv"):
+            # Read the CSV file
+            self.RawData = pd.read_csv(self.DataPath)
+        else:
+            # File format not supported
+            raise ValueError("Unsupported file format")
+        
+        self.VarsNames = self.RawData.columns[1:]
 
+        self.Trails = self.RawData.shape[0]
+
+    
+    def DataCleaning(self, Clean: bool = False):
+        """
+        Data Cleaning
+
+        Parameters:
+        -----------
+        - Clean: bool
+            Toggle Data Cleaning
+        """
+        if not hasattr(self, 'RawData'):
+            raise Exception("Error: Data need to be loaded first")
         if Clean:
             self.RawData = self.clean_numeric_columns(self.RawData)
             self.RawData = self.clean_string_columns(self.RawData)
 
+    def SetVars(self, IndependentVars: list = [], DependentVars: list = []):
+        """
+        Set Variables and Calculate Independent Variable Level Lists
+
+        Parameters:
+        -----------
+        - IndependentVars: list[str]
+            Independent Variables Name In DataFrame
+        - DependentVars: list[str]
+            Dependent Variables Name In DataFrame
+        
+        Returns:
+        -----------
+        None
+
+        """
+        self.IndependentVars = IndependentVars
+        self.DependentVars = DependentVars
+
         self.IndependentLevelsList = []
+
         for independentvar in self.IndependentVars:
             IndependentLevels = list(set(self.RawData[independentvar]))
             self.IndependentLevelsList.append(IndependentLevels)
-
-    def LoadData(self):
-        if self.DataPath.endswith(".xlsx") or self.DataPath.endswith(".xls"):
-            # 读取Excel文件
-            self.RawData = pd.read_excel(self.DataPath)
-        elif self.DataPath.endswith(".csv"):
-            # 读取CSV文件
-            self.RawData = pd.read_csv(self.DataPath)
-        else:
-            # 文件类型不支持
-            raise ValueError("Unsupported file format")
 
     def clean_numeric_columns(self, data: pd.DataFrame):
         """
