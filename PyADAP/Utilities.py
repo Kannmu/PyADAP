@@ -18,6 +18,7 @@ import os
 
 import numpy as np
 import scipy
+from colorama import Back, Fore, Style, init
 
 
 def norm(X):
@@ -62,11 +63,13 @@ def stand(X):
 
 def CreateFolder(FolderPath):
     """
-    Checks if a directory exists at the specified file path and creates it if it doesn't exist.
+    Checks if a directory exists at the specified file path. 
+    If it exists, deletes all subdirectories and files within it. 
+    Then creates a new empty directory at the same file path.
 
     Parameters:
     ----------
-    - file_path : str
+    - FolderPath : str
         The path of the directory to be created.
 
     Returns:
@@ -75,15 +78,19 @@ def CreateFolder(FolderPath):
 
     """
     # Check if the directory exists
-    if not os.path.exists(FolderPath):
-        # Create the directory
-        os.makedirs(FolderPath)
-        print(f"Directory {FolderPath} created successfully.")
-    else:
-        print(f"Directory {FolderPath} already exists.")
+    if os.path.exists(FolderPath):
+        # Delete all subdirectories and files within the directory
+        for root, dirs, files in os.walk(FolderPath, topdown=False):
+            for name in files:
+                os.remove(os.path.join(root, name))
+            for name in dirs:
+                os.rmdir(os.path.join(root, name))
+        print(Fore.RED +f"\nAll subdirectories and files in {FolderPath} have been deleted.\n")
+    # Create the directory
+    os.makedirs(FolderPath, exist_ok=True)
+    print(Fore.RED +f"Directory {FolderPath} created successfully.")
 
-
-def RoundFloat(X):
+def RoundFloat(X,Digits:int = 6):
     """
     Round a  float number to 6 decimal places.
     
@@ -99,6 +106,6 @@ def RoundFloat(X):
     
     """
     if isinstance(X, float):
-        return round(X, 6)
+        return round(X, Digits)
     else:
         return X

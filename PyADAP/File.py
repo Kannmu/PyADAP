@@ -19,8 +19,14 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment
 
 
-def SaveDataToExcel(FilePath: str = "./Default.xlsx", Statistics: pd.DataFrame = pd.DataFrame(),
-                    Normality: pd.DataFrame = pd.DataFrame(), Sphericity: pd.DataFrame = pd.DataFrame()):
+def SaveDataToExcel(
+    FilePath: str = "./Default.xlsx",
+    Statistics: pd.DataFrame = pd.DataFrame(),
+    Normality: pd.DataFrame = pd.DataFrame(),
+    Sphericity: pd.DataFrame = pd.DataFrame(),
+    Ttest: pd.DataFrame = pd.DataFrame(),
+    OneWayANOVA: pd.DataFrame = pd.DataFrame(),
+):
     """
     Save data frames to an Excel file with separate sheets.
 
@@ -39,9 +45,11 @@ def SaveDataToExcel(FilePath: str = "./Default.xlsx", Statistics: pd.DataFrame =
         - After writing the data frames to the Excel file, the `ExcelPostAdj` function is called to adjust column widths and cell alignments.
     """
     with pd.ExcelWriter(FilePath, engine="xlsxwriter") as writer:
-        Statistics.to_excel(writer, sheet_name="StatisticsResults", index=False)
-        Normality.to_excel(writer, sheet_name='NormalTestResults', index=False)
-        Sphericity.to_excel(writer, sheet_name='SphericityTestResults', index=False)
+        Statistics.to_excel(writer, sheet_name="Statistics Results", index=False)
+        Normality.to_excel(writer, sheet_name="NormalTest Results", index=False)
+        Sphericity.to_excel(writer, sheet_name="Sphericity Test Results", index=False)
+        Ttest.to_excel(writer, sheet_name="T-test Results", index=False)
+        OneWayANOVA.to_excel(writer, sheet_name="One-Way ANOVA Results", index=False)
     ExcelPostAdj(FilePath)
 
 
@@ -81,10 +89,11 @@ def ExcelPostAdj(FilePath):
         # Iterate through rows and center align cells
         for row in ws.iter_rows(min_row=2):
             for cell in row:
-                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.alignment = Alignment(horizontal="center", vertical="center")
 
     # Save the modified Excel file
     wb.save(FilePath)
+
 
 def SelectDataFile():
     """

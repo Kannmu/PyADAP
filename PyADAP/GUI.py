@@ -13,7 +13,6 @@ Repository: https://github.com/Kannmu/PyADAP
 
 """
 
-
 import tkinter as tk
 
 from cv2 import sort
@@ -21,17 +20,22 @@ from cv2 import sort
 import PyADAP.File as file
 
 
-class Interface():
+class Interface:
+    """
+    Interface class to create a graphical user interface for PyADAP.
+    """
+
     def __init__(self, title="PyADAP Interface", width=600, height=400) -> None:
         self.root = tk.Tk()
         self.root.title(title)
         self.root.geometry(f"{width}x{height}")
-        
+
         # Initialize variables lists
         self.IndependentVars = []
         self.DependentVars = []
         self.UnassignedVars = []
         self.Clean = False  # Initialize clean variable
+        self.Alpha = 0.05
 
     def ParametersSettingPage(self, Vars: list):
         self.UnassignedVars = Vars.copy()
@@ -78,6 +82,7 @@ class Interface():
         # Function to toggle clean variable
         def toggle_clean():
             self.Clean = not self.Clean
+
         # Create UI elements
         frame = tk.Frame(self.root)
         frame.pack(pady=10)
@@ -91,10 +96,14 @@ class Interface():
         buttons_frame = tk.Frame(frame)
         buttons_frame.grid(row=1, column=1, padx=10)
 
-        move_to_independent_button = tk.Button(buttons_frame, text="Independent", command=move_to_independent)
+        move_to_independent_button = tk.Button(
+            buttons_frame, text="Independent", command=move_to_independent
+        )
         move_to_independent_button.pack()
 
-        move_to_dependent_button = tk.Button(buttons_frame, text="Dependent", command=move_to_dependent)
+        move_to_dependent_button = tk.Button(
+            buttons_frame, text="Dependent", command=move_to_dependent
+        )
         move_to_dependent_button.pack()
 
         reset_button = tk.Button(buttons_frame, text="Reset", command=reset_lists)
@@ -102,6 +111,7 @@ class Interface():
 
         clean_checkbox = tk.Checkbutton(frame, text="Clean Data", command=toggle_clean)
         clean_checkbox.grid(row=2, column=0)
+
         independent_label = tk.Label(frame, text="Independent Variables")
         independent_label.grid(row=0, column=2)
         independent_listbox = tk.Listbox(frame)
@@ -111,17 +121,27 @@ class Interface():
         dependent_label.grid(row=0, column=3)
         dependent_listbox = tk.Listbox(frame)
         dependent_listbox.grid(row=1, column=3)
-        
+
         finish_button = tk.Button(frame, text="Finish", command=close_gui)
-        finish_button.grid(row=3, column=1, columnspan=2, pady=10)
+        finish_button.grid(row=3, column=3, columnspan=2, pady=10)
+
+        # Function to set alpha value
+        def set_alpha(value):
+            self.Alpha = float(value)
+
+        # Create dropdown menu for alpha selection
+        alpha_label = tk.Label(frame, text="Select Alpha:")
+        alpha_label.grid(row=3, column=0)
+        alpha_options = ["0.05", "0.01", "0.001"]
+        self.Alpha = tk.StringVar()
+        self.Alpha.set(alpha_options[0])  # default value
+        alpha_dropdown = tk.OptionMenu(
+            frame, self.Alpha, *alpha_options, command=set_alpha
+        )
+        alpha_dropdown.grid(row=3, column=1)
 
         # Initial update of lists
         update_lists()
         self.root.mainloop()
 
-        return self.IndependentVars, self.DependentVars, self.Clean
-
-
-
-
-
+        return self.IndependentVars, self.DependentVars, self.Clean, self.Alpha
