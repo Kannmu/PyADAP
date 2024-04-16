@@ -17,12 +17,10 @@ Repository: https://github.com/Kannmu/PyADAP
 
 
 import itertools
-import sys
 
-import numpy as np
 import pandas as pd
 import pingouin as pg
-from colorama import Back, Fore, Style, init
+from colorama import Fore, init
 from prettytable import PrettyTable
 from scipy.stats import kurtosis, skew
 

@@ -14,9 +14,6 @@ Repository: https://github.com/Kannmu/PyADAP
 """
 
 import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-import numpy as np
-import pandas as pd
 import seaborn as sns
 import statsmodels.formula.api as smf
 from scipy import stats
@@ -105,7 +102,7 @@ def BoxPlots(DataInstance: data.Data):
             plt.figure(figsize=(len(IndependentLevels) * 2, 8))
 
             Tempdf = DataInstance.RawData
-            Tempdf["index_by_group"] = Tempdf.groupby(independentvar).cumcount()
+            Tempdf["index_by_group"] = Tempdf.groupby([independentvar]).cumcount()
 
             # 使用pivot_table来重塑DataFrame
             result_df = Tempdf.pivot_table(

@@ -13,8 +13,6 @@ Repository: https://github.com/Kannmu/PyADAP
 
 import os
 
-import pandas as pd
-
 import PyADAP.Data as data
 import PyADAP.File as file
 import PyADAP.Fit as fit

@@ -12,13 +12,24 @@ License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
 
 """
+
 # Import necessary libraries and modules
 import os
-import sys
-
-import pandas as pd
+import warnings
 
 import PyADAP as pap
+
+warnings.filterwarnings(
+    "ignore",
+    message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.",
+)
+
+warnings.filterwarnings(
+    "ignore",
+    message="When grouping with a length-1 list-like, you will need to pass a length-1 tuple to get_group in a future version of pandas.",
+)
+warnings.filterwarnings("ignore", message="SeriesGroupBy.grouper is deprecated")
+
 
 # Select Data File in GUI
 DataPath = pap.file.SelectDataFile()
@@ -48,3 +59,5 @@ if IsClean:
 
 # Run Pipeline
 pap.Pipeline(Data=Data)
+
+os.system("Pause")

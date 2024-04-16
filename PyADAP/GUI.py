@@ -15,10 +15,6 @@ Repository: https://github.com/Kannmu/PyADAP
 
 import tkinter as tk
 
-from cv2 import sort
-
-import PyADAP.File as file
-
 
 class Interface:
     """
@@ -35,7 +31,7 @@ class Interface:
         self.DependentVars = []
         self.UnassignedVars = []
         self.Clean = False  # Initialize clean variable
-        self.Alpha = 0.05
+        self.Alpha = tk.DoubleVar()
 
     def ParametersSettingPage(self, Vars: list):
         self.UnassignedVars = Vars.copy()
@@ -127,13 +123,13 @@ class Interface:
 
         # Function to set alpha value
         def set_alpha(value):
-            self.Alpha = float(value)
+            self.Alpha = value
 
         # Create dropdown menu for alpha selection
         alpha_label = tk.Label(frame, text="Select Alpha:")
         alpha_label.grid(row=3, column=0)
-        alpha_options = ["0.05", "0.01", "0.001"]
-        self.Alpha = tk.StringVar()
+        alpha_options = [0.05, 0.01, 0.001]
+        
         self.Alpha.set(alpha_options[0])  # default value
         alpha_dropdown = tk.OptionMenu(
             frame, self.Alpha, *alpha_options, command=set_alpha
@@ -144,4 +140,4 @@ class Interface:
         update_lists()
         self.root.mainloop()
 
-        return self.IndependentVars, self.DependentVars, self.Clean, self.Alpha
+        return self.IndependentVars, self.DependentVars, self.Clean, self.Alpha.get()
