@@ -12,10 +12,13 @@ License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
 
 """
+print("Now Loading, Please wait a few seconds")
 
 # Import necessary libraries and modules
 import os
 import warnings
+
+from colorama import Fore, init
 
 import PyADAP as pap
 
@@ -29,6 +32,7 @@ warnings.filterwarnings(
     message="When grouping with a length-1 list-like, you will need to pass a length-1 tuple to get_group in a future version of pandas.",
 )
 warnings.filterwarnings("ignore", message="SeriesGroupBy.grouper is deprecated")
+
 
 
 # Select Data File in GUI

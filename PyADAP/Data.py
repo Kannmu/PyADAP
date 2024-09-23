@@ -170,7 +170,7 @@ class Data:
 
             # Replace outliers and missing values with the mean value
             data.loc[outliers, col] = np.nan
-            data[col].fillna(mean_value, inplace=True)
+            data[col] = data[col].fillna(mean_value)
 
         return data
 

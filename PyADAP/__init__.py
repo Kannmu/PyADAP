@@ -84,6 +84,6 @@ def Pipeline(
     
     # Application Finished Log Message to Console and Log File.
     Data.Print2Log("Application Finished")
-    print("Application Finished! Check the results in the following folder: " + Data.ResultsFolderPath)
+    print("Application Finished! Check the results in the following folder: " + Data.ResultsFolderPath + "\n")
 
     os.startfile(Data.ResultsFolderPath)
