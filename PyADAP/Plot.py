@@ -14,11 +14,13 @@ Repository: https://github.com/Kannmu/PyADAP
 """
 
 import matplotlib.pyplot as plt
+
 import seaborn as sns
 import statsmodels.formula.api as smf
 from scipy import stats
-
+from statannotations.Annotator import Annotator
 import PyADAP.Data as data
+from itertools import combinations
 
 plt.rcParams["font.size"] = 14
 plt.rcParams["axes.labelsize"] = 19
@@ -27,55 +29,9 @@ plt.rcParams["font.family"] = ["Arial"]
 plt.rcParams["xtick.direction"] = "in"
 plt.rcParams["ytick.direction"] = "in"
 
+Colors = ["#FFA3B5", "#FFE8BD", "#A6B8FF","#92CED6","#BAE3FF"]
 
-def ResidualPlots(DataInstance: data.Data):
-    """
-    This function calculates and plots residuals vs fitted values for each dependent variable using OLS model.
-
-    Parameters:
-    -----------
-    - DataInstance: data.Data
-        The input Data instance containing the data for which residuals are to be calculated.
-
-    """
-    # Residual vs Fitted plot for each dependent variable
-    for dependent_var in DataInstance.DependentVars:
-        # Create OLS model using statsmodels
-        formula = f"{dependent_var} ~ {' + '.join(DataInstance.IndependentVars)}"
-        model = smf.ols(formula, data=DataInstance.RawData).fit()
-        # Get fitted values and residuals
-        fitted_values = model.fittedvalues
-        residuals = model.resid
-
-        # Plotting residuals vs fitted values with different colors for each level of independent variables
-        plt.figure(figsize=(8, 6))
-        for independent_var in DataInstance.IndependentVars:
-            levels = DataInstance.RawData[independent_var].unique()
-            for level in levels:
-                level_residuals = residuals[
-                    DataInstance.RawData[independent_var] == level
-                ]
-                plt.scatter(
-                    fitted_values[DataInstance.RawData[independent_var] == level],
-                    level_residuals,
-                    label=f"{independent_var} {level}",
-                )
-            plt.axhline(y=0, color="r", linestyle="--")
-            plt.xlabel("Fitted Values")
-            plt.ylabel("Residuals")
-            plt.title(f"Residual vs. Fitted for {dependent_var}")
-            plt.legend()
-            plt.tight_layout()
-            plt.savefig(
-                DataInstance.ImageFolderPath
-                + f"\\ResidualVsFitted-{independent_var}--{dependent_var}.png",
-                dpi=200,
-            )
-            plt.clf()
-        plt.close()
-
-
-def BoxPlots(DataInstance: data.Data):
+def SingleBoxPlot(dataIns: data.Data):
     """
     Plots box plots for all the numerical columns in the provided DataFrame.
     Can plot all variables on one chart, or split into individual charts.
@@ -95,13 +51,93 @@ def BoxPlots(DataInstance: data.Data):
     - None, but saves a plot or plots containing box plots for all the numerical columns.
     """
 
-    for dependentvar in DataInstance.DependentVars:
-        for index, independentvar in enumerate(DataInstance.IndependentVars):
-            IndependentLevels = DataInstance.IndependentLevelsList[index]
+    for dependentVar in dataIns.DependentVarNames:
+        for index, independentVar in enumerate(dataIns.IndependentVarNames):
+            IndependentLevels = dataIns.IndependentVarLevels[independentVar]
 
             plt.figure(figsize=(len(IndependentLevels) * 2, 8))
 
-            Tempdf = DataInstance.RawData
+            tempDataFrame = dataIns.RawData
+            tempDataFrame["index_by_group"] = tempDataFrame.groupby([independentVar]).cumcount()
+
+            # 使用pivot_table来重塑DataFrame
+            result_df = tempDataFrame.pivot_table(
+                index="index_by_group",
+                columns=independentVar,
+                values=dependentVar,
+                aggfunc="first",
+            ).reset_index(drop=True)
+
+            melted_df = result_df.melt(var_name=independentVar, value_name=dependentVar)
+
+            ax = sns.boxplot(data=melted_df,x=independentVar, y=dependentVar, palette=Colors)
+            
+            pairs = [(th1, th2) for i, th1 in enumerate(IndependentLevels) for th2 in IndependentLevels[i+1:]]
+            
+            # 初始化Annotator对象
+            annotator = Annotator(ax, data=melted_df, x=independentVar, y=dependentVar,palette = Colors, pairs=pairs)
+
+            # 配置显著性测试参数
+            annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+
+            # 应用显著性标记
+            annotator.apply_and_annotate()
+
+            plt.tight_layout()
+            plt.savefig(
+                dataIns.ImageFolderPath
+                + independentVar
+                + "--"
+                + dependentVar
+                + "_"
+                + "Box-Plots.png",
+                dpi=200,
+            )
+
+def DoubleBoxPlot(dataIns: data.Data):
+    if(len(dataIns.IndependentVarNames) != 2):
+        return
+
+    plt.figure(figsize=(len( dataIns.IndependentVarLevels[dataIns.IndependentVarNames[0]]) * 3, 10))
+    ax = sns.boxenplot(data = dataIns.RawData, x = dataIns.IndependentVarNames[0], y = dataIns.DependentVarNames[0], hue=dataIns.IndependentVarNames[1],palette = Colors)
+    
+    # 初始化box_pairs列表
+    box_pairs = []
+    for Var1 in dataIns.IndependentVarLevels[dataIns.IndependentVarNames[0]]:
+        if len(dataIns.IndependentVarLevels[dataIns.IndependentVarNames[1]]) > 1:
+            th_mag_combinations = list(combinations(dataIns.IndependentVarLevels[dataIns.IndependentVarNames[1]], 2))  # 两两组合
+            box_pairs.extend([(Var1, mag1), (Var1, mag2)] for (mag1, mag2) in th_mag_combinations)
+
+    for Var2 in dataIns.IndependentVarLevels[dataIns.IndependentVarNames[1]]:
+        if len(dataIns.IndependentVarLevels[dataIns.IndependentVarNames[0]]) > 1:
+            th_combinations = list(combinations(dataIns.IndependentVarLevels[dataIns.IndependentVarNames[0]], 2))  # 两两组合
+            box_pairs.extend([(th1, Var2), (th2, Var2)] for (th1, th2) in th_combinations)
+    
+    # 初始化Annotator对象
+    annotator = Annotator(ax, data=dataIns.RawData, x = dataIns.IndependentVarNames[0], y = dataIns.DependentVarNames[0], hue=dataIns.IndependentVarNames[1],palette = Colors, pairs=box_pairs)
+
+    # 配置显著性测试参数
+    annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+
+    # 应用显著性标记
+    annotator.apply_and_annotate()
+
+    plt.tight_layout()
+    plt.savefig(
+        dataIns.ImageFolderPath
+        + "_"
+        + "DoubleBox-Plots.png",
+        dpi=200,
+    )
+
+def SingleViolinPlot(dataIns: data.Data):
+    for dependentvar in dataIns.DependentVarNames:
+        for index, independentvar in enumerate(dataIns.IndependentVarNames):
+            IndependentLevels = dataIns.IndependentVarLevels[independentvar]
+
+            plt.figure(figsize=(len(IndependentLevels) * 3, 8))
+
+            Tempdf = dataIns.RawData
             Tempdf["index_by_group"] = Tempdf.groupby([independentvar]).cumcount()
 
             # 使用pivot_table来重塑DataFrame
@@ -112,61 +148,77 @@ def BoxPlots(DataInstance: data.Data):
                 aggfunc="first",
             ).reset_index(drop=True)
 
-            sns.boxplot(data=result_df)
+            melted_df = result_df.melt(var_name=independentvar, value_name=dependentvar)
+
+            ax = sns.violinplot(data=melted_df,x=independentvar, y=dependentvar, palette=Colors)
+            
+            pairs = [(th1, th2) for i, th1 in enumerate(IndependentLevels) for th2 in IndependentLevels[i+1:]]
+            
+            # 初始化Annotator对象
+            annotator = Annotator(ax, data=melted_df, x=independentvar, y=dependentvar,palette = Colors, pairs=pairs)
+
+            # 配置显著性测试参数
+            annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+
+            # 应用显著性标记
+            annotator.apply_and_annotate()
+            YMax = melted_df[dependentvar].max()
+            YMin = melted_df[dependentvar].min()
+
+            plt.ylim(YMin - 0.25*(YMax-YMin),1.5*YMax)
 
             # plt.xticks(rotation=45)
-            plt.title("Box plot of " + independentvar + "-->" + dependentvar)
+            # plt.title("Violin plot of " + independentvar + "-->" + dependentvar)
             plt.tight_layout()
             plt.savefig(
-                DataInstance.ImageFolderPath
-                + "\\"
+                dataIns.ImageFolderPath
                 + independentvar
                 + "--"
                 + dependentvar
                 + "_"
-                + "Box-Plots.png",
+                + "Violin-Plots.png",
                 dpi=200,
             )
 
-
-def QQPlots(DataInstance: data.Data):
+def QQPlot(dataIns: data.Data):
     """
     Plots QQ-plots for each dependent variable and for each level of independent variables.
     Parameters:
     ----------
-    - DataInstance: data.Data
+    - dataIns: data.Data
         The input Data instance containing the data for which QQ plots are to be plotted.
     - SavePath: string
         The path where to save the QQ plots.
     """
     # QQ plot for each dependent variable
-    for dependent_var in DataInstance.DependentVars:
+    for dependent_var in dataIns.DependentVarNames:
         fig, ax = plt.subplots(figsize=(8, 8))
-        stats.probplot(DataInstance.RawData[dependent_var], dist="norm", plot=ax)
+        stats.probplot(dataIns.RawData[dependent_var], dist="norm", plot=ax)
         ax.set_title(f"QQ Plot of {dependent_var}")
         plt.tight_layout()
         plt.savefig(
-            DataInstance.ImageFolderPath + f"\\QQPlot_{dependent_var}.png", dpi=200
+            dataIns.ImageFolderPath + f"QQPlot_{dependent_var}.png", dpi=200
         )
         plt.close()
 
     # QQ plot for each level of independent variables for all dependent variables
-    for index, independent_var in enumerate(DataInstance.IndependentVars):
-        IndependentLevels = DataInstance.IndependentLevelsList[index]
-        for dependent_var in DataInstance.DependentVars:
+    for index, independent_var in enumerate(dataIns.IndependentVarNames):
+        IndependentLevels = dataIns.IndependentVarLevels[independent_var]
+        for dependent_var in dataIns.DependentVarNames:
             fig, axs = plt.subplots(
-                1, len(IndependentLevels), figsize=(len(IndependentLevels) * 6, 6)
+                1, len(IndependentLevels), figsize=(len(IndependentLevels) * 10, 6)
             )
             for i, level in enumerate(IndependentLevels):
-                level_data = DataInstance.RawData[
-                    DataInstance.RawData[independent_var] == level
+                level_data = dataIns.RawData[
+                    dataIns.RawData[independent_var] == level
                 ]
                 stats.probplot(level_data[dependent_var], dist="norm", plot=axs[i])
                 axs[i].set_title(f"{independent_var}: {level} ({dependent_var})")
             plt.tight_layout()
             plt.savefig(
-                DataInstance.ImageFolderPath
-                + f"\\{independent_var}--{dependent_var}_QQPlot-levels.png",
+                dataIns.ImageFolderPath
+                + f"{independent_var}--{dependent_var}_QQPlot-levels.png",
                 dpi=200,
             )
             plt.close()
+

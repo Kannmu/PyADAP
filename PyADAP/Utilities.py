@@ -20,7 +20,6 @@ import numpy as np
 import scipy
 from colorama import Back, Fore, Style, init
 
-
 def norm(X):
     """
     Data normalization, map data into range of [0,1]

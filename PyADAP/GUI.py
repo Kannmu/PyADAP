@@ -15,7 +15,6 @@ Repository: https://github.com/Kannmu/PyADAP
 
 import tkinter as tk
 
-
 class Interface:
     """
     Interface class to create a graphical user interface for PyADAP.
@@ -32,6 +31,7 @@ class Interface:
         self.UnassignedVars = []
         self.Clean = False  # Initialize clean variable
         self.Alpha = tk.DoubleVar()
+        self.apiKey = tk.StringVar()  # Initialize apiKey variable
 
     def ParametersSettingPage(self, Vars: list):
         self.UnassignedVars = Vars.copy()
@@ -136,8 +136,14 @@ class Interface:
         )
         alpha_dropdown.grid(row=3, column=1)
 
+        # Create apiKey input field
+        apiKey_label = tk.Label(frame, text="API Key:")
+        apiKey_label.grid(row=4, column=0)
+        apiKey_entry = tk.Entry(frame, textvariable=self.apiKey)
+        apiKey_entry.grid(row=4, column=1)
+
         # Initial update of lists
         update_lists()
         self.root.mainloop()
 
-        return self.IndependentVars, self.DependentVars, self.Clean, self.Alpha.get()
+        return self.IndependentVars, self.DependentVars, self.Clean, self.Alpha.get(), self.apiKey.get()

@@ -36,36 +36,41 @@ class Data:
         self.DataFileName, self.DataFileType = os.path.splitext(
             os.path.basename(DataPath)
         )
-
+        # Get Data File Name and Type
         self.ResultsFolderPath = (
-            os.path.dirname(self.DataPath) + "\\" + self.DataFileName + " Results"
+            os.path.dirname(self.DataPath) + "\\" + self.DataFileName + " Results\\"
         )
-
+        # Create Results Folder Path
         self.ResultsFilePath = (
-            self.ResultsFolderPath + "\\" + self.DataFileName + " " + "Results.xlsx"
+            self.ResultsFolderPath + self.DataFileName + " " + "Results.xlsx"
         )
+        # Create Image Folder Path
+        self.ImageFolderPath = self.ResultsFolderPath + "Image\\"
 
-        self.ImageFolderPath = self.ResultsFolderPath + "\\Image"
+        # Create Log File Path
+        self.LogFilePath = self.ResultsFolderPath + self.DataFileName + ".log"
 
     def LoadData(self):
         """
         Load Data DataFrame
         """
-        if self.DataPath.endswith(".xlsx") or self.DataPath.endswith(".xls"):
-            # Read the Excel file
-            self.RawData = pd.read_excel(self.DataPath)
-        elif self.DataPath.endswith(".csv"):
-            # Read the CSV file
-            self.RawData = pd.read_csv(self.DataPath)
-        else:
-            # File format not supported
-            raise ValueError("Unsupported file format")
+        try:
+            if self.DataPath.endswith((".xlsx", ".xls")):
+                self.RawData = pd.read_excel(self.DataPath)
+            elif self.DataPath.endswith(".csv"):
+                self.RawData = pd.read_csv(self.DataPath)
+            else:
+                raise ValueError(f"Unsupported file format: {self.DataPath}")
 
-        self.SubjectName = self.RawData.columns[0]
+            if self.RawData.empty:
+                raise ValueError("Loaded data is empty")
 
-        self.VarsNames = self.RawData.columns[1:]
+            self.subjectName = self.RawData.columns[0]
+            self.varsNames = self.RawData.columns[1:]
+            self.totalTrails = self.RawData.shape[0]
 
-        self.Trails = self.RawData.shape[0]
+        except Exception as e:
+            raise RuntimeError(f"Failed to load data: {str(e)}")
 
     def Print2Log(self, S: str = ""):
         """
@@ -81,19 +86,21 @@ class Data:
         None
 
         """
-        with open(self.LogFilePath, 'a') as log_file:
+        with open(self.LogFilePath, "a") as log_file:
             log_file.write(S + "\n")
 
     def DataCleaning(self):
         """
         Data Cleaning
-
         """
         self.RawData = self.clean_numeric_columns(self.RawData)
         self.RawData = self.clean_string_columns(self.RawData)
 
-    def SetVars(
-        self, IndependentVars: list = [], DependentVars: list = [], Alpha: float = 0.05
+    def InitData(
+        self,
+        IndependentVarNames: list = [],
+        DependentVarNames: list = [],
+        Alpha: float = 0.05,
     ):
         """
         Set Variables and Calculate Independent Variable Level Lists
@@ -110,28 +117,31 @@ class Data:
         None
 
         """
-        self.IndependentVars = IndependentVars
-        self.DependentVars = DependentVars
+        self.IndependentVarNames = IndependentVarNames
+        self.DependentVarNames = DependentVarNames
         self.Alpha = Alpha
-        self.IndependentLevelsList = []
+        self.IndependentVarLevels = {}
+        
+        self.IndependentVarNum = len(self.IndependentVarNames)
+        self.DependentVarNum = len(self.DependentVarNames)
 
-        for independentvar in self.IndependentVars:
-            IndependentLevels = list(set(self.RawData[independentvar]))
-            self.IndependentLevelsList.append(IndependentLevels)
+        for Name in self.IndependentVarNames:
+            # IndependentLevels = list(set(self.RawData[independentvar]))
+            TempIndependentLevels = self.RawData[Name].unique().tolist()
+            # self.IndependentLevels.append(IndependentLevels)
+            self.IndependentVarLevels[Name] = TempIndependentLevels
 
         self.CreateInitFolderAndFiles()
 
     def CreateInitFolderAndFiles(self):
-        
+
         # Create Folders
         # Main Results Folder
         utility.CreateFolder(self.ResultsFolderPath)
         # Create Image Folder
         utility.CreateFolder(self.ImageFolderPath)
 
-        # Create Log File
-        self.LogFilePath = self.ResultsFolderPath + "\\" + self.DataFileName + ".log"
-        with open(self.LogFilePath, 'w') as log_file:
+        with open(self.LogFilePath, "w", encoding="utf8") as log_file:
             log_file.write("Log file for " + self.DataFileName + "\n")
 
     def clean_numeric_columns(self, data: pd.DataFrame):

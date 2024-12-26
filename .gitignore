@@ -1,6 +1,6 @@
 # Custom ignore
 TestData/e2sr.xlsx
-
+PyADAP_V1.0/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

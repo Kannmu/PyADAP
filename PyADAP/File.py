@@ -13,6 +13,7 @@ Repository: https://github.com/Kannmu/PyADAP
 
 """
 
+import os
 import pandas as pd
 import win32ui
 from openpyxl import load_workbook
@@ -94,21 +95,34 @@ def ExcelPostAdj(FilePath):
     # Save the modified Excel file
     wb.save(FilePath)
 
-
-def SelectDataFile():
+def SelectDataFile(default_path='./'):
     """
     This function opens a file dialog for data files. The selected file path is returned by the function.
+    If the user cancels the dialog or an error occurs, None is returned.
+
+    :param default_path: The default directory to open the file dialog in.
+    :return: The selected file path, or None if no file is selected or an error occurs.
     """
-    # Create a file selection dialog
-    dlg = win32ui.CreateFileDialog(
-        1, ".xlsx;.xls;.csv", None, 0, "Data (*.xlsx;*.xls;*.csv)|*.xlsx;*.xls;*.csv||"
-    )
+    try:
+        # Create a file selection dialog
+        dlg = win32ui.CreateFileDialog(
+            1, ".xlsx;.xls;.csv", default_path, 0, "Data (*.xlsx;*.xls;*.csv)|*.xlsx;*.xls;*.csv||"
+        )
 
-    # Display the file selection dialog
-    dlg.DoModal()
+        # Display the file selection dialog
+        dlg.DoModal()
 
-    # Get the selected file path
-    DataPath = dlg.GetPathName()
+        # Get the selected file path
+        data_path = dlg.GetPathName()
 
-    # Return the selected file path
-    return DataPath
+        # Validate the file path
+        if not os.path.isfile(data_path):
+            print(f"The selected file does not exist: {data_path}")
+            return None
+
+        # Return the selected file path
+        return data_path
+
+    except Exception as e:
+        print(f"An error occurred while selecting the file: {e}")
+        return None

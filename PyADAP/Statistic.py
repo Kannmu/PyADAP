@@ -30,13 +30,13 @@ import PyADAP.Utilities as utility
 init()
 
 
-def statistics(DataInstance: data.Data):
+def statistics(dataIns: data.Data):
     """
     This function calculates and returns a DataFrame containing various statistical measures for each numerical column in the input DataFrame.
 
     Parameters:
     ----------
-    - DataInstance : data.Data
+    - dataIns : data.Data
         The input Data instance containing the data for which statistics are to be calculated.
 
     Returns:
@@ -78,56 +78,56 @@ def statistics(DataInstance: data.Data):
     StatisticsResultTable = PrettyTable()
 
     # Loop through each column in the input DataFrame.
-    for dependentvar in DataInstance.DependentVars:
-        Tempdata = DataInstance.RawData[dependentvar]
-        statistics = SingleStatistic(Tempdata, dependentvar, statistics)
+    for dependentVar in dataIns.DependentVarNames:
+        tempData = dataIns.RawData[dependentVar]
+        statistics = SingleStatistic(tempData, dependentVar, statistics)
 
         # Single independent variable different levels
-        for index, independentvar in enumerate(DataInstance.IndependentVars):
+        for index, independentVar in enumerate(dataIns.IndependentVarNames):
 
-            IndependentLevels = DataInstance.IndependentLevelsList[index]
+            IndependentLevels = dataIns.IndependentVarLevels[independentVar]
 
-            for indelevel in IndependentLevels:
+            for Level in IndependentLevels:
                 # Calculate the mean, standard deviation, kurtosis, and skewness for the column.
-                Tempdata = DataInstance.RawData[
-                    DataInstance.RawData[independentvar] == indelevel
-                ][dependentvar]
+                tempData = dataIns.RawData[
+                    dataIns.RawData[independentVar] == Level
+                ][dependentVar]
                 statistics = SingleStatistic(
-                    Tempdata,
-                    independentvar + "->" + str(indelevel) + "-->" + dependentvar,
+                    tempData,
+                    independentVar + "->" + str(Level) + "-->" + dependentVar,
                     statistics,
                 )
 
         # Interaction Between independent variables different levels
-        for IndependentvarCombination in itertools.product(
-            *DataInstance.IndependentLevelsList
+        for independentVarCombination in itertools.product(
+            *dataIns.IndependentVarLevels.values()
         ):
 
             conditions = (
-                DataInstance.RawData[var] == value
+                dataIns.RawData[var] == value
                 for var, value in zip(
-                    DataInstance.IndependentVars, IndependentvarCombination
+                    dataIns.IndependentVarNames, independentVarCombination
                 )
             )
-            combined_condition = pd.Series(True, index=DataInstance.RawData.index)
+            combined_condition = pd.Series(True, index=dataIns.RawData.index)
             for condition in conditions:
                 combined_condition &= condition
-            Tempdata = DataInstance.RawData[combined_condition][dependentvar]
+            tempData = dataIns.RawData[combined_condition][dependentVar]
             # Calculate the mean, standard deviation, kurtosis, and skewness for the column.
 
             VariableStrList = [
                 "; " + invar + "->" + str(level)
                 for invar, level in zip(
-                    DataInstance.IndependentVars, IndependentvarCombination
+                    dataIns.IndependentVarNames, independentVarCombination
                 )
             ]
 
             VariableStr = (
-                ("".join(VariableStrList) + "-->" + dependentvar)[1:]
+                ("".join(VariableStrList) + "-->" + dependentVar)[1:]
             ).lstrip()
 
             statistics = SingleStatistic(
-                Tempdata,
+                tempData,
                 VariableStr,
                 statistics,
             )
@@ -151,8 +151,8 @@ def statistics(DataInstance: data.Data):
     print(Fore.RESET)
 
     # Print To Log File
-    DataInstance.Print2Log("\nStatistics Results:")
-    DataInstance.Print2Log(str(StatisticsResultTable))
+    dataIns.Print2Log("\nStatistics Results:")
+    dataIns.Print2Log(str(StatisticsResultTable))
 
     # Return the DataFrame containing the calculated statistics.
     return statistics
@@ -180,7 +180,7 @@ def SingleStatistic(Tempdata: pd.DataFrame, VariableStr: str, statistics):
     return statistics
 
 
-def normality_test(DataInstance: data.Data):
+def normality_test(dataIns: data.Data):
     """
     This function performs a normality test on each numeric column of the provided DataFrame to determine if the data follows a normal distribution.
 
@@ -233,51 +233,54 @@ def normality_test(DataInstance: data.Data):
     # Ensure the 'Normal' column is of boolean type
     normality = normality.astype({"Normal": "bool"})
 
-    for dependentvar in DataInstance.DependentVars:
-        Tempdata = DataInstance.RawData[dependentvar]
-        normality = SingleNormalTest(Tempdata, dependentvar, normality,Alpha=DataInstance.Alpha)
-
+    for dependentVar in dataIns.DependentVarNames:
+        tempData = dataIns.RawData[dependentVar]
+        normality = SingleNormalTest(
+            tempData, dependentVar, normality, alpha=dataIns.Alpha
+        )
         # Single independent variable different levels
-        for index, independentvar in enumerate(DataInstance.IndependentVars):
-            IndependentLevels = DataInstance.IndependentLevelsList[index]
-            for indelevel in IndependentLevels:
-
-                Tempdata = DataInstance.RawData[
-                    DataInstance.RawData[independentvar] == indelevel
-                ][dependentvar]
+        for index, independentVar in enumerate(dataIns.IndependentVarNames):
+            IndependentLevels = dataIns.IndependentVarLevels[independentVar]
+            for Level in IndependentLevels:
+                tempData = dataIns.RawData[
+                    dataIns.RawData[independentVar] == Level
+                ][dependentVar]
                 normality = SingleNormalTest(
-                    Tempdata,
-                    independentvar + "->" + str(indelevel) + "-->" + dependentvar,
+                    tempData,
+                    independentVar + "->" + str(Level) + "-->" + dependentVar,
                     normality,
-                    Alpha=DataInstance.Alpha
+                    alpha=dataIns.Alpha,
                 )
 
         # Interaction Between independent variables different levels
-        for IndependentvarCombination in itertools.product(
-            *DataInstance.IndependentLevelsList
+        for independentVarCombination in itertools.product(
+            *dataIns.IndependentVarLevels.values()
         ):
-            # print(IndependentvarCombination)
+            print(dataIns.IndependentVarLevels)
+            print(independentVarCombination)
             conditions = (
-                DataInstance.RawData[var] == value
+                dataIns.RawData[var] == value
                 for var, value in zip(
-                    DataInstance.IndependentVars, IndependentvarCombination
+                    dataIns.IndependentVarNames, independentVarCombination
                 )
             )
-            combined_condition = pd.Series(True, index=DataInstance.RawData.index)
+            combined_condition = pd.Series(True, index=dataIns.RawData.index)
             for condition in conditions:
                 combined_condition &= condition
-            Tempdata = DataInstance.RawData[combined_condition][dependentvar]
+            tempData = dataIns.RawData[combined_condition][dependentVar]
             VariableStrList = [
                 "; " + invar + "->" + str(level)
                 for invar, level in zip(
-                    DataInstance.IndependentVars, IndependentvarCombination
+                    dataIns.IndependentVarNames, independentVarCombination
                 )
             ]
 
-            VariableStr = ("".join(VariableStrList) + "-->" + dependentvar)[1:]
+            VariableStr = ("".join(VariableStrList) + "-->" + dependentVar)[1:]
             VariableStr = VariableStr.lstrip()
-
-            normality = SingleNormalTest(Tempdata, VariableStr, normality,Alpha=DataInstance.Alpha)
+            
+            normality = SingleNormalTest(
+                tempData, VariableStr, normality, alpha=dataIns.Alpha
+            )
 
     # Display the results in table format using PrettyTable
     NormalResultTable.clear()
@@ -294,46 +297,49 @@ def normality_test(DataInstance: data.Data):
     print(Fore.RESET)
 
     # Print To Log File
-    DataInstance.Print2Log("\nNormality Test Results:")
-    DataInstance.Print2Log(str(NormalResultTable))
+    dataIns.Print2Log("\nNormality Test Results:")
+    dataIns.Print2Log(str(NormalResultTable))
 
     # Return the results DataFrame
     return normality
 
 
-def SingleNormalTest(Tempdata: pd.DataFrame, VariableStr: str, normality: pd.DataFrame, Alpha:float = 0.05):
+def SingleNormalTest(
+    tempData: pd.DataFrame,
+    variableStr: str,
+    normality: pd.DataFrame,
+    alpha: float = 0.05,
+):
     # Get the number of observations in the column
-    n = len(Tempdata.values)
+    n = len(tempData.values)
 
     # Select the appropriate normality test based on the number of observations
     if n < 50:
-        Method = "shapiro"
+        method = "shapiro"
     elif n < 300:
-        Method = "normaltest"
+        method = "normaltest"
     else:
-        Method = "jarque_bera"
+        method = "jarque_bera"
     # print(Method)
-    
     # Conduct the normality test using the selected method
-    test_result = pg.normality(Tempdata, method = Method,alpha = Alpha)
-
+    test_result = pg.normality(tempData, method=method, alpha=alpha)
     # Prepare the result for output
-    TempResult = pd.DataFrame(
+    tempResult = pd.DataFrame(
         {
-            "Variable": [VariableStr],
+            "Variable": [variableStr],
             "Normal": test_result["normal"],
-            "Method": ["omnibus" if Method == "normaltest" else Method][0],
+            "Method": ["omnibus" if method == "normaltest" else method][0],
             "Statistic": test_result["W"],
             "p-value": test_result["pval"],
         }
     )
     # Concatenate the current results with the overall results DataFrame
-    normality = pd.concat([normality, TempResult], ignore_index=True)
+    normality = pd.concat([normality, tempResult], ignore_index=True)
 
     return normality
 
 
-def sphericity_test(DataInstance: data.Data):
+def sphericity_test(dataIns: data.Data):
     """
     Parameters:
     ----------
@@ -359,16 +365,16 @@ def sphericity_test(DataInstance: data.Data):
     sphericity = pd.DataFrame(columns=ResultsColumns)
     sphericity = sphericity.astype({"Sphericity": "bool"})
 
-    for dependentvar in DataInstance.DependentVars:
+    for dependentvar in dataIns.DependentVarNames:
 
-        for independentvar in DataInstance.IndependentVars:
+        for independentvar in dataIns.IndependentVarNames:
             # Conduct the sphericity test
             test_result = pg.sphericity(
-                DataInstance.RawData,
+                dataIns.RawData,
                 dv=dependentvar,
                 within=independentvar,
-                subject=DataInstance.SubjectName,
-                alpha=DataInstance.Alpha
+                subject=dataIns.subjectName,
+                alpha=dataIns.Alpha,
             )
 
             # Prepare the result for output
@@ -397,19 +403,19 @@ def sphericity_test(DataInstance: data.Data):
     print(Fore.RESET)
 
     # Print To Log File
-    DataInstance.Print2Log("\nSphericity Test Results:")
-    DataInstance.Print2Log(str(SphericityResultTable))
+    dataIns.Print2Log("\nSphericity Test Results:")
+    dataIns.Print2Log(str(SphericityResultTable))
 
     return sphericity
 
 
-def ttest(DataInstance: data.Data):
+def ttest(dataIns: data.Data):
     """
     Performs t-tests on the data based on the dependent and independent variables.
 
     Parameters:
     ----------
-    DataInstance : data.Data
+    dataIns : data.Data
         An instance of the Data class containing the data to be analyzed.
 
     Returns:
@@ -431,53 +437,71 @@ def ttest(DataInstance: data.Data):
     t_test_results = t_test_results.astype({"Significance": "bool"})
 
     # Paired t-test for repeated measures
-    for dependentvar in DataInstance.DependentVars:
-        for independentvar in DataInstance.IndependentVars:
-            IndependentLevels = DataInstance.IndependentLevelsList[DataInstance.IndependentVars.index(independentvar)]
+    for dependentvar in dataIns.DependentVarNames:
+        for independentvar in dataIns.IndependentVarNames:
+            IndependentLevels = dataIns.IndependentVarLevels[independentvar]
             for level1, level2 in itertools.combinations(IndependentLevels, 2):
-                Tempdata1 = DataInstance.RawData[DataInstance.RawData[independentvar] == level1][dependentvar]
-                Tempdata2 = DataInstance.RawData[DataInstance.RawData[independentvar] == level2][dependentvar]
-                test_result = pg.ttest(Tempdata1, Tempdata2,confidence = 1-DataInstance.Alpha)
-                
+                Tempdata1 = dataIns.RawData[
+                    dataIns.RawData[independentvar] == level1
+                ][dependentvar]
+                Tempdata2 = dataIns.RawData[
+                    dataIns.RawData[independentvar] == level2
+                ][dependentvar]
+                test_result = pg.ttest(
+                    Tempdata1, Tempdata2, confidence=1 - dataIns.Alpha
+                )
+
                 # print("\n",test_result,"\n",test_result["p-val"].values[-1],type(test_result["p-val"].values[-1]))
 
-                TempResult = pd.DataFrame({
-                    "Variable": [f"{independentvar}: {level1} vs {level2} --> {dependentvar}"],
-                    "Significance": [True if test_result["p-val"].values[-1] < DataInstance.Alpha else False],
-                    "Statistic": test_result["T"].values[-1],
-                    "p-value": test_result["p-val"].values[-1]
-                })
-                
-                t_test_results = pd.concat([t_test_results, TempResult], ignore_index=True)
+                TempResult = pd.DataFrame(
+                    {
+                        "Variable": [
+                            f"{independentvar}: {level1} vs {level2} --> {dependentvar}"
+                        ],
+                        "Significance": [
+                            (
+                                True
+                                if test_result["p-val"].values[-1] < dataIns.Alpha
+                                else False
+                            )
+                        ],
+                        "Statistic": test_result["T"].values[-1],
+                        "p-value": test_result["p-val"].values[-1],
+                    }
+                )
+
+                t_test_results = pd.concat(
+                    [t_test_results, TempResult], ignore_index=True
+                )
 
     # Display the results in table format using PrettyTable
     TtestResultTable.clear()
     TtestResultTable.field_names = ResultsColumns
 
-    for i, row in t_test_results .iterrows():
+    for i, row in t_test_results.iterrows():
         TtestResultTable.add_row(row.apply(utility.RoundFloat).values)
 
     print(Fore.YELLOW + "\nT-test Results:")
     print(Fore.CYAN)
     print(TtestResultTable)
-    print(Fore.RESET )
+    print(Fore.RESET)
 
     # Print To Log File
-    DataInstance.Print2Log("\nT-test Results:")
-    DataInstance.Print2Log(str(TtestResultTable))
-
+    dataIns.Print2Log("\nT-test Results:")
+    dataIns.Print2Log(str(TtestResultTable))
 
     return t_test_results
 
-def OneWayANOVA(DataInstance: data.Data):
+
+def OneWayANOVA(dataIns: data.Data):
     """
     Performs one-way ANOVA on the data based on the independent and dependent variables.
-    
+
     Parameters:
     ----------
-    DataInstance : data.Data
+    dataIns : data.Data
         An instance of the Data class containing the data to be analyzed.
-    
+
     Returns:
     ----------
     anova_results : pd.DataFrame
@@ -489,51 +513,54 @@ def OneWayANOVA(DataInstance: data.Data):
         - p-value: The p-value associated with the test.
         - np2: Partial eta squared as a measure of effect size.
     """
-    
+
     ResultsColumns = ["Variable", "Significance", "df", "F", "p-value", "np2"]
     AnovaResultTable = PrettyTable()
 
     # Prepare the DataFrame for results
     anova_results = pd.DataFrame(columns=ResultsColumns)
     anova_results = anova_results.astype({"Significance": "bool"})
-    
+
     # One-way ANOVA for each combination of independent and dependent variables
-    for dependentvar in DataInstance.DependentVars:
-        for independentvar in DataInstance.IndependentVars:
+    for dependentvar in dataIns.DependentVarNames:
+        for independentvar in dataIns.IndependentVarNames:
             test_result = pg.anova(
-                data=DataInstance.RawData,
+                data=dataIns.RawData,
                 dv=dependentvar,
                 between=independentvar,
-                detailed=True
+                detailed=True,
             )
-        
+
             # Prepare the result for output
-            TempResult = pd.DataFrame({
-                "Variable": [f"{independentvar} --> {dependentvar}"],
-                "Significance": [True if test_result["p-unc"][0] < DataInstance.Alpha else False],
-                "df": [test_result["DF"][0]],
-                "F": [test_result["F"][0]],
-                "p-value": [test_result["p-unc"][0]],
-                "np2": [test_result["np2"][0]]
-            })
-        
+            TempResult = pd.DataFrame(
+                {
+                    "Variable": [f"{independentvar} --> {dependentvar}"],
+                    "Significance": [
+                        True if test_result["p-unc"][0] < dataIns.Alpha else False
+                    ],
+                    "df": [test_result["DF"][0]],
+                    "F": [test_result["F"][0]],
+                    "p-value": [test_result["p-unc"][0]],
+                    "np2": [test_result["np2"][0]],
+                }
+            )
+
             anova_results = pd.concat([anova_results, TempResult], ignore_index=True)
-    
+
     # Display the results in table format using PrettyTable
     AnovaResultTable.clear()
     AnovaResultTable.field_names = ResultsColumns
-    
+
     for i, row in anova_results.iterrows():
         AnovaResultTable.add_row(row.apply(utility.RoundFloat).values)
-    
+
     print(Fore.YELLOW + "\nOne-Way ANOVA Results:")
     print(Fore.MAGENTA)
     print(AnovaResultTable)
     print(Fore.RESET)
 
     # Print To Log File
-    DataInstance.Print2Log("\nOne-Way ANOVA Results:")
-    DataInstance.Print2Log(str(AnovaResultTable))
+    dataIns.Print2Log("\nOne-Way ANOVA Results:")
+    dataIns.Print2Log(str(AnovaResultTable))
 
     return anova_results
-

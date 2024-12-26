@@ -15,12 +15,11 @@ import os
 
 import PyADAP.Data as data
 import PyADAP.File as file
-import PyADAP.Fit as fit
 import PyADAP.GUI as gui
 import PyADAP.Plot as plot
 import PyADAP.Statistic as statistic
 import PyADAP.Utilities as utility
-
+import PyADAP.Writing as writing
 
 def Pipeline(
     Data: data.Data,
@@ -39,36 +38,40 @@ def Pipeline(
 
     Data.Print2Log("Performing Statistics Calculation")
     print("Performing Statistics Calculation")
-    StatisticsResults = statistic.statistics(DataInstance=Data)
+    StatisticsResults = statistic.statistics(dataIns=Data)
 
     Data.Print2Log("Drawing Box Plots")
     print("Drawing Box Plots")
-    plot.BoxPlots(
-        DataInstance=Data,
-    )
+    if Data.IndependentVarNum == 1:
+        plot.SingleBoxPlot(dataIns=Data)
+    elif Data.IndependentVarNum == 2:
+        plot.DoubleBoxPlot(dataIns=Data)
+    else:
+        raise Exception("Too many independent variables. PyADAP is only support one or two independent variables.")
 
-    Data.Print2Log("Drawing Residual Plots")
-    print("Drawing Residual Plots")
-    plot.ResidualPlots(DataInstance=Data)
-    NormalTestResults = statistic.normality_test(DataInstance=Data)
+    Data.Print2Log("Drawing Violinplot")
+    print("Drawing Violinplot")
+    plot.SingleViolinPlot(dataIns=Data)
+
+    plot.DoubleBoxPlot(dataIns=Data)
 
     Data.Print2Log("Drawing QQ Plots")
     print("Drawing QQ Plots")
-    plot.QQPlots(
-        DataInstance=Data,
-    )
+    plot.QQPlot(dataIns=Data)
+
+    NormalTestResults = statistic.normality_test(dataIns=Data)
 
     Data.Print2Log("Performing Sphericity Test")
     print("Performing Sphericity Test")
-    SphericityTestResults = statistic.sphericity_test(DataInstance=Data)
+    SphericityTestResults = statistic.sphericity_test(dataIns=Data)
 
     Data.Print2Log("Performing T-Test")
     print("Performing T-Test")
-    TtestResults = statistic.ttest(DataInstance=Data)
+    TtestResults = statistic.ttest(dataIns=Data)
 
     Data.Print2Log("Performing One-Way ANOVA")
     print("Performing One-Way ANOVA")
-    OneWayANOVAResults = statistic.OneWayANOVA(DataInstance=Data)
+    OneWayANOVAResults = statistic.OneWayANOVA(dataIns=Data)
 
     Data.Print2Log("Writing Results To Excel File")
     print("Writing Results Into Excel File")
@@ -81,9 +84,5 @@ def Pipeline(
         TtestResults,
         OneWayANOVAResults,
     )
-    
-    # Application Finished Log Message to Console and Log File.
-    Data.Print2Log("Application Finished")
-    print("Application Finished! Check the results in the following folder: " + Data.ResultsFolderPath + "\n")
 
-    os.startfile(Data.ResultsFolderPath)
+    

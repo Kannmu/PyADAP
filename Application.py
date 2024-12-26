@@ -12,6 +12,7 @@ License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
 
 """
+
 print("Now Loading, Please wait a few seconds")
 
 # Import necessary libraries and modules
@@ -21,6 +22,7 @@ import warnings
 from colorama import Fore, init
 
 import PyADAP as pap
+import PyADAP.Writing as writing
 
 warnings.filterwarnings(
     "ignore",
@@ -34,7 +36,6 @@ warnings.filterwarnings(
 warnings.filterwarnings("ignore", message="SeriesGroupBy.grouper is deprecated")
 
 
-
 # Select Data File in GUI
 DataPath = pap.file.SelectDataFile()
 
@@ -46,22 +47,36 @@ Data.LoadData()
 
 # Select Parameters In GUI
 Interface = pap.gui.Interface()
-IndependentVars, DependentVars, IsClean, Alpha = Interface.ParametersSettingPage(
-    Data.VarsNames.tolist()
+independentVars, dependentVars, isUsingDataClean, Alpha, apiKey = (
+    Interface.ParametersSettingPage(Data.varsNames.tolist())
 )
 
+if(apiKey is ""):
+    apiKey = "sk-caQnDXpwc00jFJu4LqO76ob5iPHeZzGwHuWdlZQZZFV9xMuv"
+
 # Check if Independent Vars and Dependent Vars are not empty.
-if not IndependentVars or not DependentVars:
+if not independentVars or not dependentVars:
     raise ValueError("IndependentVars or DependentVars cannot be empty.")
 
 # Set Variables in Data Instance
-Data.SetVars(IndependentVars, DependentVars, Alpha)
+Data.InitData(independentVars, dependentVars, Alpha)
 
 # Optional Data Cleaning Process
-if IsClean:
+if isUsingDataClean:
     Data.DataCleaning()
 
 # Run Pipeline
 pap.Pipeline(Data=Data)
 
+# Writing Results Text
+Writer = writing.Writer(dataIns=Data,apiKey = apiKey)
+
+# Application Finished Log Message to Console and Log File.
+Data.Print2Log("Application Finished")
+print(
+    "\nApplication Finished! Check the results in the following folder: "
+    + Data.ResultsFolderPath
+    + "\n"
+)
+os.startfile(Data.ResultsFolderPath)
 os.system("Pause")
