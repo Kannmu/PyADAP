@@ -51,7 +51,7 @@ systemPrompt = {
 
 
 class Writer():
-    def __init__(self, dataIns:data.Data, apiKey = "sk-caQnDXpwc00jFJu4LqO76ob5iPHeZzGwHuWdlZQZZFV9xMuv"):
+    def __init__(self, dataIns:data.Data, apiKey ):
         self.systemPrompt = systemPrompt
         self.client = OpenAI(
             api_key=apiKey,
