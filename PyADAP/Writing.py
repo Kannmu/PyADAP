@@ -52,7 +52,7 @@ systemPrompt = {
 # }
 
 class Writer():
-    def __init__(self, dataIns:data.Data, apiKey = "sk-1093dcab736946a39f4887dd226e07a8"):
+    def __init__(self, dataIns:data.Data, apiKey ):
         self.systemPrompt = systemPrompt
         self.chatClient = OpenAI(
             api_key="sk-1093dcab736946a39f4887dd226e07a8",
