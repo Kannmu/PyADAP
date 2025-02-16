@@ -22,7 +22,7 @@ import PyADAP.Utilities as utility
 import PyADAP.Writing as writing
 
 def Pipeline(
-    Data: data.Data,
+    data: data.Data, interface: gui.Interface
 ):
     """This function performs the entire process of analyzing the data and generates a report on the results.
 
@@ -33,56 +33,68 @@ def Pipeline(
         pd.DataFrame: The results of the analysis, in a Pandas DataFrame format.
     """
 
-    Data.Print2Log("Pipeline Started")
-    print("Pipeline Started")
+    data.Print2Log("Pipeline Started")
 
-    Data.Print2Log("Performing Statistics Calculation")
-    print("Performing Statistics Calculation")
-    StatisticsResults = statistic.statistics(dataIns=Data)
+    Statist = statistic.Statistics(dataIns=data)
 
-    Data.Print2Log("Drawing Box Plots")
-    print("Drawing Box Plots")
-    if Data.IndependentVarNum == 1:
-        plot.SingleBoxPlot(dataIns=Data)
-    elif Data.IndependentVarNum == 2:
-        plot.DoubleBoxPlot(dataIns=Data)
+    # Optional Data Cleaning Process
+    if interface.isClean:
+        data.DataCleaning()
+
+    data.Print2Log("Performing Statistics Calculation")
+    StatisticsResults = Statist.BasicStatistics()
+
+    if interface.enableBoxCox:
+        # data.BoxCoxConvert(data.Data)
+        data.LogConvert(data.Data)
+
+    data.Print2Log("Performing NormalTest Test")
+    NormalTestResults = Statist.NormalityTest()
+
+    data.Print2Log("Performing Sphericity Test")
+    SphericityTestResults = Statist.SphericityTest()
+
+    data.Print2Log("Performing T-Test")
+    tTestResults = Statist.TTest()
+
+    data.Print2Log("Performing One-Way ANOVA")
+    OneWayANOVAResults = Statist.OneWayANOVA()
+
+    if(data.IndependentVarNum > 1):
+        # Performing Two-Way ANOVA
+        data.Print2Log("Performing Two-Way ANOVA")
+        TwoWayANOVAResults = Statist.TwoWayANOVA()
     else:
-        raise Exception("Too many independent variables. PyADAP is only support one or two independent variables.")
+        TwoWayANOVAResults = None
 
-    Data.Print2Log("Drawing Violinplot")
-    print("Drawing Violinplot")
-    plot.SingleViolinPlot(dataIns=Data)
+    rmANOVAResults = Statist.RM_ANOVA()
 
-    plot.DoubleBoxPlot(dataIns=Data)
+    data.Print2Log("Drawing Box Plots")
+    plot.SingleBoxPlot(dataIns=data)
 
-    Data.Print2Log("Drawing QQ Plots")
-    print("Drawing QQ Plots")
-    plot.QQPlot(dataIns=Data)
+    if data.IndependentVarNum == 2:
+        plot.DoubleBoxPlot(dataIns=data)
+    else:
+        print("Too many independent variables. plots is only support one or two independent variables currently.")
 
-    NormalTestResults = statistic.normality_test(dataIns=Data)
+    data.Print2Log("Drawing Violin Plot")
+    plot.SingleViolinPlot(dataIns=data)
 
-    Data.Print2Log("Performing Sphericity Test")
-    print("Performing Sphericity Test")
-    SphericityTestResults = statistic.sphericity_test(dataIns=Data)
+    plot.DoubleBoxPlot(dataIns=data)
 
-    Data.Print2Log("Performing T-Test")
-    print("Performing T-Test")
-    TtestResults = statistic.ttest(dataIns=Data)
+    data.Print2Log("Drawing QQ Plots")
+    plot.QQPlot(dataIns=data)
 
-    Data.Print2Log("Performing One-Way ANOVA")
-    print("Performing One-Way ANOVA")
-    OneWayANOVAResults = statistic.OneWayANOVA(dataIns=Data)
 
-    Data.Print2Log("Writing Results To Excel File")
-    print("Writing Results Into Excel File")
-
+    data.Print2Log("Writing Results To Excel File")
     file.SaveDataToExcel(
-        Data.ResultsFilePath,
+        data,
         StatisticsResults,
         NormalTestResults,
         SphericityTestResults,
-        TtestResults,
+        tTestResults,
         OneWayANOVAResults,
+        TwoWayANOVAResults,
+        rmANOVAResults,
     )
 
-    

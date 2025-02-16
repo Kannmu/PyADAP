@@ -17,9 +17,8 @@ Repository: https://github.com/Kannmu/PyADAP
 import os
 
 import numpy as np
-import scipy
 from colorama import Back, Fore, Style, init
-
+import PyADAP.Data as data
 def norm(X):
     """
     Data normalization, map data into range of [0,1]
@@ -108,3 +107,4 @@ def RoundFloat(X,Digits:int = 6):
         return round(X, Digits)
     else:
         return X
+    

@@ -18,40 +18,30 @@ import pandas as pd
 import win32ui
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment
-
+import PyADAP.Data as data
 
 def SaveDataToExcel(
-    FilePath: str = "./Default.xlsx",
-    Statistics: pd.DataFrame = pd.DataFrame(),
-    Normality: pd.DataFrame = pd.DataFrame(),
-    Sphericity: pd.DataFrame = pd.DataFrame(),
-    Ttest: pd.DataFrame = pd.DataFrame(),
-    OneWayANOVA: pd.DataFrame = pd.DataFrame(),
+    dataIns: data.Data,
+    Statistics: pd.DataFrame,
+    Normality: pd.DataFrame,
+    Sphericity: pd.DataFrame,
+    tTest: pd.DataFrame,
+    OneWayANOVA: pd.DataFrame,
+    TwoWayANOVA: pd.DataFrame,
+    rmANOVAResults:pd.DataFrame
 ):
-    """
-    Save data frames to an Excel file with separate sheets.
-
-    Args:
-        FilePath (str): The file path to save the Excel file. Default is "./Default.xlsx".
-        Statistics (pd.DataFrame): The data frame containing statistical results.
-        Normality (pd.DataFrame): The data frame containing normality test results.
-        Sphericity (pd.DataFrame): The data frame containing sphericity test results.
-
-    Returns:
-        None
-
-    Notes:
-        - The function uses the `pd.ExcelWriter` context manager to write the data frames to separate sheets in the Excel file.
-        - The `index=False` argument is used to prevent row indices from being written to the Excel file.
-        - After writing the data frames to the Excel file, the `ExcelPostAdj` function is called to adjust column widths and cell alignments.
-    """
-    with pd.ExcelWriter(FilePath, engine="xlsxwriter") as writer:
+    if not dataIns.ResultsFilePath: return
+    with pd.ExcelWriter(dataIns.ResultsFilePath, engine="xlsxwriter") as writer:
+        # dataIns.GetDataInfo().to_excel(writer, sheet_name="Data Information", index=False)
         Statistics.to_excel(writer, sheet_name="Statistics Results", index=False)
         Normality.to_excel(writer, sheet_name="NormalTest Results", index=False)
         Sphericity.to_excel(writer, sheet_name="Sphericity Test Results", index=False)
-        Ttest.to_excel(writer, sheet_name="T-test Results", index=False)
-        OneWayANOVA.to_excel(writer, sheet_name="One-Way ANOVA Results", index=False)
-    ExcelPostAdj(FilePath)
+        if(not rmANOVAResults is None): rmANOVAResults.to_excel(writer, sheet_name="RM ANOVA Results", index=False)
+        # tTest.to_excel(writer, sheet_name="T-test Results", index=False)
+        # OneWayANOVA.to_excel(writer, sheet_name="One-Way ANOVA Results", index=False)
+        # if(not TwoWayANOVA is None): TwoWayANOVA.to_excel(writer, sheet_name="Two-Way ANOVA Results", index=False)
+
+    ExcelPostAdj(dataIns.ResultsFilePath)
 
 
 def ExcelPostAdj(FilePath):

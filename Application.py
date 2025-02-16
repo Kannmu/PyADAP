@@ -19,8 +19,6 @@ print("Now Loading, Please wait a few seconds")
 import os
 import warnings
 
-from colorama import Fore, init
-
 import PyADAP as pap
 import PyADAP.Writing as writing
 
@@ -40,43 +38,39 @@ warnings.filterwarnings("ignore", message="SeriesGroupBy.grouper is deprecated")
 DataPath = pap.file.SelectDataFile()
 
 # Construct Data Instance
-Data = pap.data.Data(DataPath)
+data = pap.data.Data(DataPath)
 
 # Load Data From the DataPath
-Data.LoadData()
+data.LoadData()
 
 # Select Parameters In GUI
-Interface = pap.gui.Interface()
-independentVars, dependentVars, isUsingDataClean, Alpha, apiKey = (
-    Interface.ParametersSettingPage(Data.varsNames.tolist())
-)
+interface = pap.gui.Interface()
 
-if(apiKey is ""):
-    apiKey = "sk-caQnDXpwc00jFJu4LqO76ob5iPHeZzGwHuWdlZQZZFV9xMuv"
+interface.ParametersSettingPage(data.varsNames.tolist())
+
+if interface.apiKey == "":
+    apiKey = "sk-1093dcab736946a39f4887dd226e07a8"
 
 # Check if Independent Vars and Dependent Vars are not empty.
-if not independentVars or not dependentVars:
+if not interface.independentVars or not interface.dependentVars:
     raise ValueError("IndependentVars or DependentVars cannot be empty.")
 
 # Set Variables in Data Instance
-Data.InitData(independentVars, dependentVars, Alpha)
-
-# Optional Data Cleaning Process
-if isUsingDataClean:
-    Data.DataCleaning()
+data.InitData(interface.independentVars, interface.dependentVars, interface.alpha)
 
 # Run Pipeline
-pap.Pipeline(Data=Data)
+pap.Pipeline(data=data,interface=interface)
 
-# Writing Results Text
-Writer = writing.Writer(dataIns=Data,apiKey = apiKey)
+if interface.enableWriting:
+    # Writing Results Text
+    Writer = writing.Writer(dataIns=data, apiKey=apiKey)
 
 # Application Finished Log Message to Console and Log File.
-Data.Print2Log("Application Finished")
+data.Print2Log("Application Finished")
 print(
     "\nApplication Finished! Check the results in the following folder: "
-    + Data.ResultsFolderPath
+    + data.ResultsFolderPath
     + "\n"
 )
-os.startfile(Data.ResultsFolderPath)
+os.startfile(data.ResultsFolderPath)
 os.system("Pause")

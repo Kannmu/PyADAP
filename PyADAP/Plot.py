@@ -57,28 +57,15 @@ def SingleBoxPlot(dataIns: data.Data):
 
             plt.figure(figsize=(len(IndependentLevels) * 2, 8))
 
-            tempDataFrame = dataIns.RawData
-            tempDataFrame["index_by_group"] = tempDataFrame.groupby([independentVar]).cumcount()
-
-            # 使用pivot_table来重塑DataFrame
-            result_df = tempDataFrame.pivot_table(
-                index="index_by_group",
-                columns=independentVar,
-                values=dependentVar,
-                aggfunc="first",
-            ).reset_index(drop=True)
-
-            melted_df = result_df.melt(var_name=independentVar, value_name=dependentVar)
-
-            ax = sns.boxplot(data=melted_df,x=independentVar, y=dependentVar, palette=Colors)
+            ax = sns.boxplot(data=dataIns.RawData, x=independentVar, y=dependentVar, palette=Colors, hue = independentVar,legend=False)
             
             pairs = [(th1, th2) for i, th1 in enumerate(IndependentLevels) for th2 in IndependentLevels[i+1:]]
             
             # 初始化Annotator对象
-            annotator = Annotator(ax, data=melted_df, x=independentVar, y=dependentVar,palette = Colors, pairs=pairs)
+            annotator = Annotator(ax, data=dataIns.Data, x=independentVar, y=dependentVar,palette = Colors, pairs=pairs)
 
             # 配置显著性测试参数
-            annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+            annotator.configure(test='t-test_paired', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
 
             # 应用显著性标记
             annotator.apply_and_annotate()
@@ -114,10 +101,10 @@ def DoubleBoxPlot(dataIns: data.Data):
             box_pairs.extend([(th1, Var2), (th2, Var2)] for (th1, th2) in th_combinations)
     
     # 初始化Annotator对象
-    annotator = Annotator(ax, data=dataIns.RawData, x = dataIns.IndependentVarNames[0], y = dataIns.DependentVarNames[0], hue=dataIns.IndependentVarNames[1],palette = Colors, pairs=box_pairs)
+    annotator = Annotator(ax, data=dataIns.Data, x = dataIns.IndependentVarNames[0], y = dataIns.DependentVarNames[0], hue=dataIns.IndependentVarNames[1],palette = Colors, pairs=box_pairs)
 
     # 配置显著性测试参数
-    annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+    annotator.configure(test='t-test_paired', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
 
     # 应用显著性标记
     annotator.apply_and_annotate()
@@ -131,50 +118,35 @@ def DoubleBoxPlot(dataIns: data.Data):
     )
 
 def SingleViolinPlot(dataIns: data.Data):
-    for dependentvar in dataIns.DependentVarNames:
-        for index, independentvar in enumerate(dataIns.IndependentVarNames):
-            IndependentLevels = dataIns.IndependentVarLevels[independentvar]
+    for dependentVar in dataIns.DependentVarNames:
+        for index, independentVar in enumerate(dataIns.IndependentVarNames):
+            IndependentLevels = dataIns.IndependentVarLevels[independentVar]
 
             plt.figure(figsize=(len(IndependentLevels) * 3, 8))
 
-            Tempdf = dataIns.RawData
-            Tempdf["index_by_group"] = Tempdf.groupby([independentvar]).cumcount()
-
-            # 使用pivot_table来重塑DataFrame
-            result_df = Tempdf.pivot_table(
-                index="index_by_group",
-                columns=independentvar,
-                values=dependentvar,
-                aggfunc="first",
-            ).reset_index(drop=True)
-
-            melted_df = result_df.melt(var_name=independentvar, value_name=dependentvar)
-
-            ax = sns.violinplot(data=melted_df,x=independentvar, y=dependentvar, palette=Colors)
+            ax = sns.violinplot(data=dataIns.RawData,x=independentVar, y=dependentVar, palette=Colors, hue = independentVar,legend=False)
             
             pairs = [(th1, th2) for i, th1 in enumerate(IndependentLevels) for th2 in IndependentLevels[i+1:]]
             
             # 初始化Annotator对象
-            annotator = Annotator(ax, data=melted_df, x=independentvar, y=dependentvar,palette = Colors, pairs=pairs)
+            annotator = Annotator(ax, data=dataIns.Data, x=independentVar, y=dependentVar,palette = Colors, pairs=pairs)
 
             # 配置显著性测试参数
-            annotator.configure(alpha = dataIns.Alpha, test='t-test_ind', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
+            annotator.configure(test='t-test_paired', text_format='star', line_height=0.03, line_width=1,hide_non_significant = True)
 
             # 应用显著性标记
             annotator.apply_and_annotate()
-            YMax = melted_df[dependentvar].max()
-            YMin = melted_df[dependentvar].min()
+            YMax = dataIns.RawData[dependentVar].max()
+            YMin = dataIns.RawData[dependentVar].min()
 
             plt.ylim(YMin - 0.25*(YMax-YMin),1.5*YMax)
 
-            # plt.xticks(rotation=45)
-            # plt.title("Violin plot of " + independentvar + "-->" + dependentvar)
             plt.tight_layout()
             plt.savefig(
                 dataIns.ImageFolderPath
-                + independentvar
+                + independentVar
                 + "--"
-                + dependentvar
+                + dependentVar
                 + "_"
                 + "Violin-Plots.png",
                 dpi=200,
@@ -193,7 +165,7 @@ def QQPlot(dataIns: data.Data):
     # QQ plot for each dependent variable
     for dependent_var in dataIns.DependentVarNames:
         fig, ax = plt.subplots(figsize=(8, 8))
-        stats.probplot(dataIns.RawData[dependent_var], dist="norm", plot=ax)
+        stats.probplot(dataIns.Data[dependent_var], dist="norm", plot=ax)
         ax.set_title(f"QQ Plot of {dependent_var}")
         plt.tight_layout()
         plt.savefig(
@@ -209,8 +181,8 @@ def QQPlot(dataIns: data.Data):
                 1, len(IndependentLevels), figsize=(len(IndependentLevels) * 10, 6)
             )
             for i, level in enumerate(IndependentLevels):
-                level_data = dataIns.RawData[
-                    dataIns.RawData[independent_var] == level
+                level_data = dataIns.Data[
+                    dataIns.Data[independent_var] == level
                 ]
                 stats.probplot(level_data[dependent_var], dist="norm", plot=axs[i])
                 axs[i].set_title(f"{independent_var}: {level} ({dependent_var})")

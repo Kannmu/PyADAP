@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 import PyADAP.Utilities as utility
+from scipy.stats import boxcox
 
 
 class Data:
@@ -29,9 +30,10 @@ class Data:
         """
         Create Data Instance
         """
+
         self.DataPath = DataPath
 
-        self.Alpha = 0.05  # Default Value for Alpha
+        self.alpha = 0.05  # Default Value for Alpha
 
         self.DataFileName, self.DataFileType = os.path.splitext(
             os.path.basename(DataPath)
@@ -50,57 +52,16 @@ class Data:
         # Create Log File Path
         self.LogFilePath = self.ResultsFolderPath + self.DataFileName + ".log"
 
-    def LoadData(self):
-        """
-        Load Data DataFrame
-        """
-        try:
-            if self.DataPath.endswith((".xlsx", ".xls")):
-                self.RawData = pd.read_excel(self.DataPath)
-            elif self.DataPath.endswith(".csv"):
-                self.RawData = pd.read_csv(self.DataPath)
-            else:
-                raise ValueError(f"Unsupported file format: {self.DataPath}")
+        # Create Results Text Path
+        self.ResultsTextPath = self.ResultsFolderPath + "Results Text.txt"
 
-            if self.RawData.empty:
-                raise ValueError("Loaded data is empty")
-
-            self.subjectName = self.RawData.columns[0]
-            self.varsNames = self.RawData.columns[1:]
-            self.totalTrails = self.RawData.shape[0]
-
-        except Exception as e:
-            raise RuntimeError(f"Failed to load data: {str(e)}")
-
-    def Print2Log(self, S: str = ""):
-        """
-        Writes the provided string to the log file.
-
-        Parameters:
-        -----------
-        - S: str
-            The string to be written to the log file.
-
-        Returns:
-        -----------
-        None
-
-        """
-        with open(self.LogFilePath, "a") as log_file:
-            log_file.write(S + "\n")
-
-    def DataCleaning(self):
-        """
-        Data Cleaning
-        """
-        self.RawData = self.clean_numeric_columns(self.RawData)
-        self.RawData = self.clean_string_columns(self.RawData)
+        self.transformation = "None"
 
     def InitData(
         self,
         IndependentVarNames: list = [],
         DependentVarNames: list = [],
-        Alpha: float = 0.05,
+        alpha: float = 0.05,
     ):
         """
         Set Variables and Calculate Independent Variable Level Lists
@@ -119,19 +80,72 @@ class Data:
         """
         self.IndependentVarNames = IndependentVarNames
         self.DependentVarNames = DependentVarNames
-        self.Alpha = Alpha
+        self.alpha = alpha
         self.IndependentVarLevels = {}
-        
         self.IndependentVarNum = len(self.IndependentVarNames)
         self.DependentVarNum = len(self.DependentVarNames)
 
         for Name in self.IndependentVarNames:
-            # IndependentLevels = list(set(self.RawData[independentvar]))
-            TempIndependentLevels = self.RawData[Name].unique().tolist()
-            # self.IndependentLevels.append(IndependentLevels)
+            TempIndependentLevels = self.Data[Name].unique().tolist()
             self.IndependentVarLevels[Name] = TempIndependentLevels
 
         self.CreateInitFolderAndFiles()
+
+    def LoadData(self):
+        """
+        Load Data DataFrame
+        """
+        try:
+            if self.DataPath.endswith((".xlsx", ".xls")):
+                self.RawData = pd.read_excel(self.DataPath)
+            elif self.DataPath.endswith(".csv"):
+                self.RawData = pd.read_csv(self.DataPath)
+            else:
+                raise ValueError(f"Unsupported file format: {self.DataPath}")
+
+            if self.RawData.empty:
+                raise ValueError("Loaded data is empty")
+
+            # Initialize a new DataFrame to store the transformed data
+            self.Data = self.RawData.copy()
+
+            self.subjectName = self.Data.columns[0]
+            self.varsNames = self.Data.columns[1:]
+            self.totalTrails = self.Data.shape[0]
+
+        except Exception as e:
+            raise RuntimeError(f"Failed to load data: {str(e)}")
+
+    def Print2Log(self, S: str = "", enablePrint: bool = True):
+        """
+        Writes the provided string to the log file.
+
+        Parameters:
+        -----------
+        - S: str
+            The string to be written to the log file.
+
+        Returns:
+        -----------
+        None
+
+        """
+        if enablePrint:
+            print(S)
+        with open(self.LogFilePath, "a", encoding="utf-8") as log_file:
+            log_file.write(S + "\n")
+
+    def ReadLogs(self):
+        with open(self.LogFilePath, "r", encoding="utf-8") as file:
+            content = file.read()
+        return content
+
+    def DataCleaning(self):
+        """
+        Data Cleaning
+        """
+        self.Data = self.clean_numeric_columns(self.Data)
+        self.Data = self.clean_string_columns(self.Data)
 
     def CreateInitFolderAndFiles(self):
 
@@ -208,8 +222,71 @@ class Data:
                     else x
                 )
             )
-
             # Drop rows with missing values
             data.dropna(subset=[col], inplace=True)
-
         return data
+
+    def GetDataInfo(self)->pd.DataFrame:
+        """
+            Returns a pandas DataFrame containing information about the dataset, including the number of rows and columns, the names of the dependent variables, and the names of the independent variables.
+        """
+        
+        info = {
+            "Transformation": self.transformation,
+            "Total Trials": self.totalTrails,
+        }
+
+        return pd.DataFrame(info)
+
+    def BoxCoxConvert(self,originalData:pd.DataFrame):
+        """
+            Converts the dependent variables in the DataFrame to a normal distribution using the Box-Cox transformation.
+            The transformed data is stored in a new DataFrame called self.TransformedData.
+        """
+        self.transformation = "Box-Cox"
+        data = originalData.copy()
+        # Apply Box-Cox transformation to each dependent variable
+        for dep_var in self.DependentVarNames:
+            # Ensure the data is positive (Box-Cox requires positive values)
+            if (data[dep_var] <= 0).any():
+                # Shift the data to make it positive
+                min_value = data[dep_var].min()
+                shift_value = abs(min_value) + 1 if min_value <= 0 else 0
+                data[dep_var] += shift_value
+
+            # Apply Box-Cox transformation
+            transformed_data, lambda_value = boxcox(data[dep_var])
+            self.Data[dep_var] = transformed_data
+
+            # Log the lambda value used for the transformation
+            self.Print2Log(
+                f"Box-Cox transformation applied to {dep_var} with lambda = {lambda_value}"
+            )
+
+        # Log the completion of the transformation
+        self.Print2Log("Box-Cox transformation completed for all dependent variables.")
+
+    def LogConvert(self,originalData:pd.DataFrame):
+        """
+        Converts the dependent variables in the DataFrame to a normal distribution using the logarithmic transformation.
+        The transformed data is stored in the same DataFrame.
+        """
+        self.transformation = "Log"
+        data = originalData.copy()
+        # Apply log transformation to each dependent variable
+        for dep_var in self.DependentVarNames:
+            # Ensure the data is positive (log transformation requires positive values)
+            if (data[dep_var] <= 0).any():
+                # Shift the data to make it positive
+                min_value = data[dep_var].min()
+                shift_value = abs(min_value) + 1 if min_value <= 0 else 0
+                data[dep_var] += shift_value
+
+            # Apply log transformation
+            self.Data[dep_var] = np.log(data[dep_var])
+
+            # Log the transformation
+            self.Print2Log(f"Logarithmic transformation applied to {dep_var}.")
+
+        # Log the completion of the transformation
+        self.Print2Log("Logarithmic transformation completed for all dependent variables.")
