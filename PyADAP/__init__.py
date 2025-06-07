@@ -1,100 +1,65 @@
-"""
-PyADAP
-=====
+"""PyADAP 3.0
+=============
 
-PyADAP: Python Automated Data Analysis Pipeline
+PyADAP: Python Automated Data Analysis Pipeline - Version 3.0
+
+A comprehensive, automated statistical analysis pipeline with enhanced scientific rigor
+and intelligent automation capabilities.
+
+Key Features in 3.0:
+- Enhanced statistical analysis with automatic assumption checking
+- Intelligent test selection based on data characteristics
+- Advanced data preprocessing and outlier detection
+- Comprehensive effect size calculations
+- Automated report generation with statistical interpretations
+- Modern GUI with real-time feedback
+- Robust error handling and validation
 
 Author: Kannmu
-Date: 2024/3/31
+Date: 2024/12/19
 License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
-
 """
 
-import os
+__version__ = "3.0.0"
+__author__ = "Kannmu"
+__email__ = "kannmu@163.com"
+__license__ = "MIT"
 
-import PyADAP.Data as data
-import PyADAP.File as file
-import PyADAP.GUI as gui
-import PyADAP.Plot as plot
-import PyADAP.Statistic as statistic
-import PyADAP.Utilities as utility
-import PyADAP.Writing as writing
+from .core import DataManager, StatisticalAnalyzer, Pipeline
+from .gui import MainWindow
+from .visualization import Plotter
+from .utils import Logger, Validator
+from .config import Config
 
-def Pipeline(
-    data: data.Data, interface: gui.Interface
-):
-    """This function performs the entire process of analyzing the data and generates a report on the results.
+# Aliases for backward compatibility
+ModernInterface = MainWindow
+AdvancedPlotter = Plotter
 
+# Main pipeline function for backward compatibility
+def run_analysis(data_path: str, **kwargs):
+    """Run complete statistical analysis pipeline.
+    
     Args:
-        Data (data.Data): The data to analyze.
-
+        data_path: Path to data file
+        **kwargs: Additional configuration options
+        
     Returns:
-        pd.DataFrame: The results of the analysis, in a Pandas DataFrame format.
+        Analysis results and generated reports
     """
+    pipeline = Pipeline()
+    return pipeline.run(data_path, **kwargs)
 
-    data.Print2Log("Pipeline Started")
-
-    Statist = statistic.Statistics(dataIns=data)
-
-    # Optional Data Cleaning Process
-    if interface.isClean:
-        data.DataCleaning()
-
-    data.Print2Log("Performing Statistics Calculation")
-    StatisticsResults = Statist.BasicStatistics()
-
-    if interface.enableBoxCox:
-        # data.BoxCoxConvert(data.Data)
-        data.LogConvert(data.Data)
-
-    data.Print2Log("Performing NormalTest Test")
-    NormalTestResults = Statist.NormalityTest()
-
-    data.Print2Log("Performing Sphericity Test")
-    SphericityTestResults = Statist.SphericityTest()
-
-    data.Print2Log("Performing T-Test")
-    tTestResults = Statist.TTest()
-
-    data.Print2Log("Performing One-Way ANOVA")
-    OneWayANOVAResults = Statist.OneWayANOVA()
-
-    if(data.IndependentVarNum > 1):
-        # Performing Two-Way ANOVA
-        data.Print2Log("Performing Two-Way ANOVA")
-        TwoWayANOVAResults = Statist.TwoWayANOVA()
-    else:
-        TwoWayANOVAResults = None
-
-    rmANOVAResults = Statist.RM_ANOVA()
-
-    data.Print2Log("Drawing Box Plots")
-    plot.SingleBoxPlot(dataIns=data)
-
-    if data.IndependentVarNum == 2:
-        plot.DoubleBoxPlot(dataIns=data)
-    else:
-        print("Too many independent variables. plots is only support one or two independent variables currently.")
-
-    data.Print2Log("Drawing Violin Plot")
-    plot.SingleViolinPlot(dataIns=data)
-
-    plot.DoubleBoxPlot(dataIns=data)
-
-    data.Print2Log("Drawing QQ Plots")
-    plot.QQPlot(dataIns=data)
-
-
-    data.Print2Log("Writing Results To Excel File")
-    file.SaveDataToExcel(
-        data,
-        StatisticsResults,
-        NormalTestResults,
-        SphericityTestResults,
-        tTestResults,
-        OneWayANOVAResults,
-        TwoWayANOVAResults,
-        rmANOVAResults,
-    )
-
+__all__ = [
+    'DataManager',
+    'StatisticalAnalyzer', 
+    'Pipeline',
+    'MainWindow',
+    'Plotter',
+    'ModernInterface',  # Alias for MainWindow
+    'AdvancedPlotter',  # Alias for Plotter
+    'Logger',
+    'Validator',
+    'Config',
+    'run_analysis'
+]

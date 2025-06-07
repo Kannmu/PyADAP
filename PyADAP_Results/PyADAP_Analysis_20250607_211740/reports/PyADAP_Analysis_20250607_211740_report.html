@@ -1,0 +1,679 @@
+
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyADAP 数据分析报告 - PyADAP_Analysis_20250607_211740</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 40px;
+            text-align: center;
+            margin-bottom: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            color: #2c3e50;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        
+        .header .subtitle {
+            color: #7f8c8d;
+            font-size: 1.2em;
+            margin-bottom: 20px;
+        }
+        
+        .timestamp {
+            background: #3498db;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 25px;
+            display: inline-block;
+            font-weight: 500;
+        }
+        
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        }
+        
+        .card-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        .card-icon {
+            font-size: 2em;
+            margin-right: 15px;
+            padding: 15px;
+            border-radius: 50%;
+            color: white;
+        }
+        
+        .icon-data { background: #e74c3c; }
+        .icon-stats { background: #f39c12; }
+        .icon-quality { background: #27ae60; }
+        .icon-results { background: #9b59b6; }
+        
+        .card h3 {
+            color: #2c3e50;
+            font-size: 1.3em;
+            margin-bottom: 15px;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid #ecf0f1;
+        }
+        
+        .metric:last-child {
+            border-bottom: none;
+        }
+        
+        .metric-label {
+            font-weight: 500;
+            color: #7f8c8d;
+        }
+        
+        .metric-value {
+            font-weight: 700;
+            color: #2c3e50;
+            font-size: 1.1em;
+        }
+        
+        .variables-list {
+            margin: 10px 0;
+        }
+        
+        .variable-tag {
+            display: inline-block;
+            background: #3498db;
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            margin: 3px;
+            font-size: 0.9em;
+        }
+        
+        .variable-tag.dependent { background: #e74c3c; }
+        .variable-tag.independent { background: #27ae60; }
+        .variable-tag.subject { background: #f39c12; }
+        
+        .results-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+        }
+        
+        .results-tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #ecf0f1;
+        }
+        
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 15px 25px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 500;
+            color: #7f8c8d;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s ease;
+        }
+        
+        .tab-button.active {
+            color: #3498db;
+            border-bottom-color: #3498db;
+        }
+        
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .json-viewer {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            overflow-x: auto;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .footer {
+            text-align: center;
+            padding: 30px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9em;
+        }
+        
+        .footer a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #ecf0f1;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 10px 0;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #3498db, #2ecc71);
+            border-radius: 4px;
+            animation: progressAnimation 2s ease-in-out;
+        }
+        
+        @keyframes progressAnimation {
+            from { width: 0%; }
+            to { width: 100%; }
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .status-success {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .collapsible {
+            cursor: pointer;
+            padding: 15px;
+            background: #f8f9fa;
+            border: none;
+            text-align: left;
+            outline: none;
+            font-size: 1em;
+            font-weight: 500;
+            width: 100%;
+            border-radius: 8px;
+            margin: 5px 0;
+            transition: background-color 0.3s ease;
+        }
+        
+        .collapsible:hover {
+            background: #e9ecef;
+        }
+        
+        .collapsible-content {
+            padding: 0 15px;
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+            background: #f8f9fa;
+            border-radius: 0 0 8px 8px;
+        }
+        
+        .collapsible-content.active {
+            max-height: 500px;
+            padding: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-chart-line"></i> PyADAP 数据分析报告</h1>
+            <p class="subtitle">PyADAP_Analysis_20250607_211740</p>
+            <div class="timestamp">
+                <i class="fas fa-clock"></i> 生成时间: 2025-06-07 21:17:41
+            </div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-data">
+                        <i class="fas fa-database"></i>
+                    </div>
+                    <h3>数据概览</h3>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">数据行数</span>
+                    <span class="metric-value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">数据列数</span>
+                    <span class="metric-value">0</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">分析耗时</span>
+                    <span class="metric-value">N/A</span>
+                </div>
+                <div class="metric">
+                    <span class="metric-label">分析状态</span>
+                    <span class="status-badge status-success">完成</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-stats">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>变量配置</h3>
+                </div>
+                <div class="variables-list">
+                    <p><strong>因变量:</strong></p>
+                    <span class="variable-tag dependent">Total Completion Time (s)</span>
+                    <p><strong>自变量:</strong></p>
+                    <span class="variable-tag independent">Gaze Threshold (ms)</span>
+<span class="variable-tag independent">Magnify Rate</span>
+                    
+                </div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-quality">
+                        <i class="fas fa-check-circle"></i>
+                    </div>
+                    <h3>数据质量</h3>
+                </div>
+                <div class="metric"><span class="metric-label">重复行</span><span class="metric-value">0</span></div>
+            </div>
+            
+            <div class="card">
+                <div class="card-header">
+                    <div class="card-icon icon-results">
+                        <i class="fas fa-flask"></i>
+                    </div>
+                    <h3>分析结果</h3>
+                </div>
+                <div class="metric"><span class="metric-label">统计检验</span><span class="metric-value">2 项</span></div>
+<div class="metric"><span class="metric-label">可视化图表</span><span class="metric-value">2 个</span></div>
+<div class="metric"><span class="metric-label">建议</span><span class="metric-value">7 条</span></div>
+<div class="metric"><span class="metric-label">假设检验</span><span class="metric-value">4 项</span></div>
+            </div>
+        </div>
+        
+        <div class="results-section">
+            <h2><i class="fas fa-microscope"></i> 详细分析结果</h2>
+            <div class="results-tabs">
+                <button class="tab-button active" onclick="showTab('summary')">概要</button>
+                <button class="tab-button" onclick="showTab('quality')">数据质量</button>
+                <button class="tab-button" onclick="showTab('statistics')">统计分析</button>
+                <button class="tab-button" onclick="showTab('raw')">原始数据</button>
+            </div>
+            
+            <div id="summary" class="tab-content active">
+                <h3>分析概要</h3>
+        <div class="metric">
+            <span class="metric-label">分析ID</span>
+            <span class="metric-value">PyADAP_Analysis_20250607_211740</span>
+        </div>
+        
+            <div class="metric">
+                <span class="metric-label">开始时间</span>
+                <span class="metric-value">2025-06-07 21:17:40</span>
+            </div>
+            <h4>主要建议</h4><ul><li>Non-normal distributions detected in: Total Completion Time (s). Consider non-parametric tests or data transformation.</li><li>Unequal variances detected in: Total Completion Time (s)_by_Gaze Threshold (ms), Total Completion Time (s)_by_Magnify Rate. Consider Welch's t-test or non-parametric alternatives.</li><li>Repeated measures detected. Use appropriate repeated measures tests.</li><li>No statistically significant results found. Consider power analysis and sample size requirements.</li><li>Always interpret results in the context of your research question and domain knowledge.</li></ul>
+            </div>
+            
+            <div id="quality" class="tab-content">
+                <h3>数据质量详情</h3>
+            </div>
+            
+            <div id="statistics" class="tab-content">
+                <h3>统计分析结果</h3><h4>统计检验</h4><button class="collapsible">Total Completion Time (s)_by_Gaze Threshold (ms)</button><div class="collapsible-content"><div class="json-viewer"><pre>test_name: Friedman test
+test_type: nonparametric
+statistic: 3.9473684210526585
+p_value: 0.26720376141785285
+effect_size: None
+effect_size_interpretation: None
+confidence_interval: None
+power: None
+sample_size: 19
+assumptions_met: None
+interpretation: Not statistically significant (p ≥ 0.05)
+recommendations: None
+additional_info: None
+</pre></div></div><button class="collapsible">Total Completion Time (s)_by_Magnify Rate</button><div class="collapsible-content"><div class="json-viewer"><pre>test_name: Friedman test
+test_type: nonparametric
+statistic: 0.7368421052631504
+p_value: 0.6918258252705198
+effect_size: None
+effect_size_interpretation: None
+confidence_interval: None
+power: None
+sample_size: 19
+assumptions_met: None
+interpretation: Not statistically significant (p ≥ 0.05)
+recommendations: None
+additional_info: None
+</pre></div></div><h4>假设检验</h4><button class="collapsible">normality</button><div class="collapsible-content"><div class="json-viewer"><pre>Total Completion Time (s): {'tests': {'shapiro_wilk': {'statistic': np.float64(0.8837979460180039), 'p_value': np.float64(1.4116557577552976e-25), 'normal': np.False_}, 'dagostino_pearson': {'statistic': np.float64(210.22635062844404), 'p_value': np.float64(2.23834994674591e-46), 'normal': np.False_}, 'jarque_bera': {'statistic': np.float64(400.5038104119434), 'p_value': np.float64(1.0757282612202027e-87), 'normal': np.False_}, 'anderson_darling': {'statistic': np.float64(27.803190221061413), 'critical_value': np.float64(0.784), 'normal': np.False_}, 'kolmogorov_smirnov': {'statistic': np.float64(0.11654627350958313), 'p_value': np.float64(3.000744246421817e-11), 'normal': np.False_}}, 'overall_normal': False, 'normal_test_ratio': 0.0, 'skewness': np.float64(1.3562063625643401), 'kurtosis': np.float64(1.8071578081613047), 'sufficient_data': True}
+</pre></div></div><button class="collapsible">homogeneity</button><div class="collapsible-content"><div class="json-viewer"><pre>Total Completion Time (s)_by_Gaze Threshold (ms): {'tests': {'levene': {'statistic': np.float64(4.652855502582825), 'p_value': np.float64(0.0031020786063267864), 'homogeneous': np.False_}, 'bartlett': {'statistic': np.float64(21.20221383584571), 'p_value': np.float64(9.557122899556223e-05), 'homogeneous': np.False_}, 'fligner_killeen': {'statistic': np.float64(18.906693184781712), 'p_value': np.float64(0.00028581639937738933), 'homogeneous': np.False_}}, 'overall_homogeneous': False, 'homogeneous_test_ratio': 0.0, 'group_variances': [np.float64(1.9452608882070002), np.float64(1.4833988150341917), np.float64(2.384151632390862), np.float64(1.3977331925411312)], 'variance_ratio': np.float64(1.7057272769321485)}
+Total Completion Time (s)_by_Magnify Rate: {'tests': {'levene': {'statistic': np.float64(3.6208914380113453), 'p_value': np.float64(0.02714549420626258), 'homogeneous': np.False_}, 'bartlett': {'statistic': np.float64(14.654560126457188), 'p_value': np.float64(0.0006573591330168477), 'homogeneous': np.False_}, 'fligner_killeen': {'statistic': np.float64(8.486142259386067), 'p_value': np.float64(0.0143634121355284), 'homogeneous': np.False_}}, 'overall_homogeneous': False, 'homogeneous_test_ratio': 0.0, 'group_variances': [np.float64(1.8544049803949116), np.float64(2.1535270301393292), np.float64(1.3887826194425714)], 'variance_ratio': np.float64(1.5506581087569415)}
+</pre></div></div><button class="collapsible">independence</button><div class="collapsible-content"><div class="json-viewer"><pre>repeated_measures_detected: True
+max_observations_per_subject: 48
+subjects_with_multiple_observations: 19
+Total Completion Time (s)_durbin_watson: {'statistic': np.float64(0.22931671182064967), 'interpretation': 'Positive autocorrelation detected'}
+</pre></div></div><button class="collapsible">linearity</button><div class="collapsible-content"><div class="json-viewer"><pre>Total Completion Time (s)_vs_Gaze Threshold (ms): {'pearson_r': np.float64(-0.06146930467094847), 'spearman_r': np.float64(-0.05595951716050761), 'linearity_score': np.float64(0.9944902124895592), 'likely_linear': np.True_, 'sample_size': 912}
+</pre></div></div>
+            </div>
+            
+            <div id="raw" class="tab-content">
+                <h3>原始分析结果</h3>
+                <div class="json-viewer">
+                    <pre>{
+  "data_summary": {
+    "validation": {
+      "dependent_variables": {
+        "Total Completion Time (s)": {
+          "type": "float64",
+          "is_numeric": true,
+          "unique_values": 912,
+          "missing_values": "0",
+          "missing_percentage": 0.0
+        }
+      },
+      "independent_variables": {
+        "Gaze Threshold (ms)": {
+          "type": "int64",
+          "is_numeric": true,
+          "unique_values": 4,
+          "missing_values": "0",
+          "missing_percentage": 0.0
+        },
+        "Magnify Rate": {
+          "type": "category",
+          "is_numeric": false,
+          "unique_values": 3,
+          "missing_values": "0",
+          "missing_percentage": 0.0
+        }
+      },
+      "warnings": [],
+      "recommendations": []
+    }
+  },
+  "quality_report": {
+    "assessment": {
+      "overall_score": 95.0,
+      "issues": [],
+      "strengths": [
+        "Low missing data rate: 0.0%",
+        "Low duplicate rate: 0.0%",
+        "Adequate sample size: 912",
+        "No extreme skewness detected"
+      ],
+      "recommendations": [
+        "Data quality is good. Proceed with analysis"
+      ]
+    }
+  },
+  "assumptions": {
+    "normality": {
+      "Total Completion Time (s)": {
+        "tests": {
+          "shapiro_wilk": {
+            "statistic": 0.8837979460180039,
+            "p_value": 1.4116557577552976e-25,
+            "normal": "False"
+          },
+          "dagostino_pearson": {
+            "statistic": 210.22635062844404,
+            "p_value": 2.23834994674591e-46,
+            "normal": "False"
+          },
+          "jarque_bera": {
+            "statistic": 400.5038104119434,
+            "p_value": 1.0757282612202027e-87,
+            "normal": "False"
+          },
+          "anderson_darling": {
+            "statistic": 27.803190221061413,
+            "critical_value": 0.784,
+            "normal": "False"
+          },
+          "kolmogorov_smirnov": {
+            "statistic": 0.11654627350958313,
+            "p_value": 3.000744246421817e-11,
+            "normal": "False"
+          }
+        },
+        "overall_normal": false,
+        "normal_test_ratio": 0.0,
+        "skewness": 1.3562063625643401,
+        "kurtosis": 1.8071578081613047,
+        "sufficient_data": true
+      }
+    },
+    "homogeneity": {
+      "Total Completion Time (s)_by_Gaze Threshold (ms)": {
+        "tests": {
+          "levene": {
+            "statistic": 4.652855502582825,
+            "p_value": 0.0031020786063267864,
+            "homogeneous": "False"
+          },
+          "bartlett": {
+            "statistic": 21.20221383584571,
+            "p_value": 9.557122899556223e-05,
+            "homogeneous": "False"
+          },
+          "fligner_killeen": {
+            "statistic": 18.906693184781712,
+            "p_value": 0.00028581639937738933,
+            "homogeneous": "False"
+          }
+        },
+        "overall_homogeneous": false,
+        "homogeneous_test_ratio": 0.0,
+        "group_variances": [
+          1.9452608882070002,
+          1.4833988150341917,
+          2.384151632390862,
+          1.3977331925411312
+        ],
+        "variance_ratio": 1.7057272769321485
+      },
+      "Total Completion Time (s)_by_Magnify Rate": {
+        "tests": {
+          "levene": {
+            "statistic": 3.6208914380113453,
+            "p_value": 0.02714549420626258,
+            "homogeneous": "False"
+          },
+          "bartlett": {
+            "statistic": 14.654560126457188,
+            "p_value": 0.0006573591330168477,
+            "homogeneous": "False"
+          },
+          "fligner_killeen": {
+            "statistic": 8.486142259386067,
+            "p_value": 0.0143634121355284,
+            "homogeneous": "False"
+          }
+        },
+        "overall_homogeneous": false,
+        "homogeneous_test_ratio": 0.0,
+        "group_variances": [
+          1.8544049803949116,
+          2.1535270301393292,
+          1.3887826194425714
+        ],
+        "variance_ratio": 1.5506581087569415
+      }
+    },
+    "independence": {
+      "repeated_measures_detected": "True",
+      "max_observations_per_subject": "48",
+      "subjects_with_multiple_observations": "19",
+      "Total Completion Time (s)_durbin_watson": {
+        "statistic": 0.22931671182064967,
+        "interpretation": "Positive autocorrelation detected"
+      }
+    },
+    "linearity": {
+      "Total Completion Time (s)_vs_Gaze Threshold (ms)": {
+        "pearson_r": -0.06146930467094847,
+        "spearman_r": -0.05595951716050761,
+        "linearity_score": 0.9944902124895592,
+        "likely_linear": "True",
+        "sample_size": 912
+      }
+    }
+  },
+  "statistical_tests": {
+    "Total Completion Time (s)_by_Gaze Threshold (ms)": {
+      "test_name": "Friedman test",
+      "test_type": "nonparametric",
+      "statistic": 3.9473684210526585,
+      "p_value": 0.26720376141785285,
+      "effect_size": null,
+      "effect_size_interpretation": null,
+      "confidence_interval": null,
+      "power": null,
+      "sample_size": 19,
+      "assumptions_met": null,
+      "interpretation": "Not statistically significant (p ≥ 0.05)",
+      "recommendations": null,
+      "additional_info": null
+    },
+    "Total Completion Time (s)_by_Magnify Rate": {
+      "test_name": "Friedman test",
+      "test_type": "nonparametric",
+      "statistic": 0.7368421052631504,
+      "p_value": 0.6918258252705198,
+      "effect_size": null,
+      "effect_size_interpretation": null,
+      "confidence_interval": null,
+      "power": null,
+      "sample_size": 19,
+      "assumptions_met": null,
+      "interpretation": "Not statistically significant (p ≥ 0.05)",
+      "recommendations": null,
+      "additional_info": null
+    }
+  },
+  "visualizations": {
+    "Total Completion Time (s)_by_Gaze Threshold (ms)_boxplot": "D:\\Data\\OneDrive\\Projects\\PyADAP\\PyADAP_Results\\PyADAP_Analysis_20250607_211740\\plots\\Total Completion Time (s)_by_Gaze Threshold (ms)_boxplot.png",
+    "Total Completion Time (s)_by_Magnify Rate_boxplot": "D:\\Data\\OneDrive\\Projects\\PyADAP\\PyADAP_Results\\PyADAP_Analysis_20250607_211740\\plots\\Total Completion Time (s)_by_Magnify Rate_boxplot.png"
+  },
+  "recommendations": [
+    "Non-normal distributions detected in: Total Completion Time (s). Consider non-parametric tests or data transformation.",
+    "Unequal variances detected in: Total Completion Time (s)_by_Gaze Threshold (ms), Total Completion Time (s)_by_Magnify Rate. Consider Welch's t-test or non-parametric alternatives.",
+    "Repeated measures detected. Use appropriate repeated measures tests.",
+    "No statistically significant results found. Consider power analysis and sample size requirements.",
+    "Always interpret results in the context of your research question and domain knowledge.",
+    "Consider replication and validation of findings with independent datasets.",
+    "Report effect sizes and confidence intervals alongside p-values."
+  ]
+}</pre>
+                </div>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>由 <strong>PyADAP</strong> 自动生成 | Python 自动化数据分析管道</p>
+            <p>© 2024 PyADAP Project</p>
+        </div>
+    </div>
+    
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab and activate button
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+        }
+        
+        // Initialize collapsible elements
+        document.addEventListener('DOMContentLoaded', function() {
+            const collapsibles = document.querySelectorAll('.collapsible');
+            collapsibles.forEach(collapsible => {
+                collapsible.addEventListener('click', function() {
+                    this.classList.toggle('active');
+                    const content = this.nextElementSibling;
+                    content.classList.toggle('active');
+                });
+            });
+        });
+    </script>
+</body>
+</html>
+        

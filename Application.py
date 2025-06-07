@@ -1,76 +1,99 @@
-"""
-PyADAP
-=====
+"""PyADAP 3.0 Application
+========================
 
-PyADAP: Python Automated Data Analysis Pipeline
+PyADAP: Python Automated Data Analysis Pipeline - Version 3.0
 
-Application
+Main application entry point with modern GUI interface and enhanced
+statistical analysis capabilities.
+
+Key Features in 3.0:
+- Modern GUI with intuitive workflow
+- Enhanced statistical analysis with automatic assumption checking
+- Intelligent test selection based on data characteristics
+- Advanced data preprocessing and outlier detection
+- Comprehensive effect size calculations
+- Automated report generation with statistical interpretations
+- Robust error handling and validation
 
 Author: Kannmu
-Date: 2024/3/31
+Date: 2024/12/19
 License: MIT License
 Repository: https://github.com/Kannmu/PyADAP
-
 """
 
-print("Now Loading, Please wait a few seconds")
-
-# Import necessary libraries and modules
+import sys
 import os
 import warnings
+from pathlib import Path
+from traceback import print_exc
 
-import PyADAP as pap
-import PyADAP.Writing as writing
+# Add PyADAP to path if needed
+sys.path.insert(0, str(Path(__file__).parent))
 
-warnings.filterwarnings(
-    "ignore",
-    message="The behavior of DataFrame concatenation with empty or all-NA entries is deprecated.",
-)
+# Import PyADAP 3.0 modules
+try:
+    from PyADAP import __version__
+    from PyADAP.gui import MainWindow
+    from PyADAP.config import Config
+    from PyADAP.utils import get_logger, setup_logging
+except ImportError as e:
+    print_exc()
+    print(f"Error importing PyADAP modules: {e}")
+    print("Please ensure PyADAP 3.0 is properly installed.")
+    sys.exit(1)
 
-warnings.filterwarnings(
-    "ignore",
-    message="When grouping with a length-1 list-like, you will need to pass a length-1 tuple to get_group in a future version of pandas.",
-)
-warnings.filterwarnings("ignore", message="SeriesGroupBy.grouper is deprecated")
+# Configure warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=RuntimeWarning)
+
+def main():
+    """Main application entry point."""
+    try:
+        # Setup logging
+        setup_logging()
+        logger = get_logger("PyADAP.Application")
+        
+        # Print welcome message
+        print(f"\n{'='*60}")
+        print(f"  PyADAP {__version__} - Advanced Data Analysis Platform")
+        print(f"{'='*60}")
+        print("Loading application, please wait...\n")
+        
+        logger.info(f"Starting PyADAP {__version__}")
+        
+        # Load configuration
+        config = Config()
+        logger.info("Configuration loaded successfully")
+        
+        # Create and run main window
+        app = MainWindow(config=config)
+        logger.info("Main window initialized")
+        
+        print("Application ready! Opening main window...")
+        
+        # Start the GUI application
+        app.run()
+        
+        logger.info("Application closed normally")
+        
+    except KeyboardInterrupt:
+        print("\nApplication interrupted by user.")
+        sys.exit(0)
+        
+    except Exception as e:
+        print(f"\nFatal error: {str(e)}")
+        print("Please check the log files for more details.")
+        
+        # Try to log the error if possible
+        try:
+            logger = get_logger("PyADAP.Application")
+            logger.error(f"Fatal application error: {str(e)}", exc_info=True)
+        except:
+            pass
+        
+        sys.exit(1)
 
 
-# Select Data File in GUI
-DataPath = pap.file.SelectDataFile()
-
-# Construct Data Instance
-data = pap.data.Data(DataPath)
-
-# Load Data From the DataPath
-data.LoadData()
-
-# Select Parameters In GUI
-interface = pap.gui.Interface()
-
-interface.ParametersSettingPage(data.varsNames.tolist())
-
-if interface.apiKey == "":
-    apiKey = "sk-1093dcab736946a39f4887dd226e07a8"
-
-# Check if Independent Vars and Dependent Vars are not empty.
-if not interface.independentVars or not interface.dependentVars:
-    raise ValueError("IndependentVars or DependentVars cannot be empty.")
-
-# Set Variables in Data Instance
-data.InitData(interface.independentVars, interface.dependentVars, interface.alpha)
-
-# Run Pipeline
-pap.Pipeline(data=data,interface=interface)
-
-if interface.enableWriting:
-    # Writing Results Text
-    Writer = writing.Writer(dataIns=data, apiKey=apiKey)
-
-# Application Finished Log Message to Console and Log File.
-data.Print2Log("Application Finished")
-print(
-    "\nApplication Finished! Check the results in the following folder: "
-    + data.ResultsFolderPath
-    + "\n"
-)
-os.startfile(data.ResultsFolderPath)
-os.system("Pause")
+if __name__ == "__main__":
+    main()

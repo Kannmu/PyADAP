@@ -1,0 +1,54 @@
+================================================================================
+STATISTICAL ANALYSIS REPORT
+================================================================================
+
+Dataset: 64 observations
+Dependent variables: Math, English
+Independent variables: Grade, Class
+
+ASSUMPTION CHECKS
+----------------------------------------
+Normality Tests:
+  ✓ Math: Normal
+  ✗ English: Non-normal
+
+Homogeneity of Variance:
+  ✓ Math_by_Grade: Homogeneous
+  ✓ Math_by_Class: Homogeneous
+  ✓ English_by_Grade: Homogeneous
+  ✓ English_by_Class: Homogeneous
+
+STATISTICAL TESTS
+----------------------------------------
+
+Pearson Correlation (Math_by_Grade):
+  Statistic: 0.6822
+  p-value: 0.0000
+  Effect size: 0.6822 (large)
+  95% CI: [0.5243, 0.7947]
+  Sample size: 64
+  Interpretation: Statistically significant (p < 0.05)
+
+Pearson Correlation (Math_by_Class):
+  Statistic: 0.7087
+  p-value: 0.0000
+  Effect size: 0.7087 (large)
+  95% CI: [0.5606, 0.8129]
+  Sample size: 64
+  Interpretation: Statistically significant (p < 0.05)
+
+Spearman Correlation (English_by_Grade):
+  Statistic: 0.2421
+  p-value: 0.0539
+  Effect size: 0.2421 (small)
+  Sample size: 64
+  Interpretation: Not statistically significant (p ≥ 0.05)
+
+Spearman Correlation (English_by_Class):
+  Statistic: 0.9684
+  p-value: 0.0000
+  Effect size: 0.9684 (large)
+  Sample size: 64
+  Interpretation: Statistically significant (p < 0.05)
+
+================================================================================
