@@ -7,17 +7,15 @@ statistical analysis results, plots, and reports.
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
-import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
-import numpy as np
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 from pathlib import Path
 import json
 import webbrowser
-import tempfile
 
-from ..utils import Logger, get_logger, format_number, format_p_value
+from ..utils import get_logger, format_number, format_p_value
+from ..utils.helpers import format_cell_value
 
 
 class ResultsViewer:
@@ -269,6 +267,26 @@ class ResultsViewer:
         self.progress_bar.pack_forget()  # Hide initially
     
     def _create_empty_plot(self) -> None:
+        """Create an empty plot as placeholder."""
+        # Clear existing widgets in plot display frame
+        for widget in self.plot_display_frame.winfo_children():
+            widget.destroy()
+            
+        # Create empty figure
+        fig = Figure(figsize=(8, 6))
+        ax = fig.add_subplot(111)
+        ax.text(0.5, 0.5, 'No plot selected', ha='center', va='center')
+        ax.set_xticks([])
+        ax.set_yticks([])
+        
+        # Create canvas
+        canvas = FigureCanvasTkAgg(fig, master=self.plot_display_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+        
+        # Add toolbar
+        toolbar = NavigationToolbar2Tk(canvas, self.plot_display_frame)
+        toolbar.update()
         """Create an empty plot placeholder."""
         # Clear existing plot
         for widget in self.plot_display_frame.winfo_children():
@@ -546,25 +564,52 @@ class ResultsViewer:
         Returns:
             Formatted string
         """
-        if pd.isnull(value):
-            return "NaN"
-        
-        if isinstance(value, (int, float)):
-            if isinstance(value, float) and abs(value) < 1e-3:
-                return f"{value:.2e}"
-            elif isinstance(value, float):
-                return f"{value:.4f}"
-            else:
-                return str(value)
-        
-        # Truncate long strings
-        str_val = str(value)
-        if len(str_val) > 30:
-            return str_val[:27] + "..."
-        
-        return str_val
+        return format_cell_value(value, max_length=30)
     
     def _display_plot(self, plot_name: str) -> None:
+        """Display the selected plot.
+        
+        Args:
+            plot_name: Name of the plot to display
+        """
+        try:
+            # Clear existing widgets
+            for widget in self.plot_display_frame.winfo_children():
+                widget.destroy()
+            
+            # Get the plot figure
+            if plot_name not in self.results.get('plots', {}):
+                self.logger.error(f"Plot {plot_name} not found in results")
+                return
+                
+            plot = self.results['plots'][plot_name]
+            
+            # Handle both Figure objects and saved plot paths
+            if isinstance(plot, Figure):
+                fig = plot
+            elif isinstance(plot, (str, Path)):
+                # If it's a path, create a new figure and load the image
+                fig = Figure(figsize=(8, 6))
+                ax = fig.add_subplot(111)
+                img = plt.imread(str(plot))
+                ax.imshow(img)
+                ax.axis('off')
+            else:
+                self.logger.error(f"Unexpected plot type: {type(plot)}")
+                return
+            
+            # Create canvas and display plot
+            canvas = FigureCanvasTkAgg(fig, master=self.plot_display_frame)
+            canvas.draw()
+            canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+            
+            # Add toolbar
+            toolbar = NavigationToolbar2Tk(canvas, self.plot_display_frame)
+            toolbar.update()
+            
+        except Exception as e:
+            self.logger.error(f"Error displaying plot {plot_name}: {str(e)}")
+            self._create_empty_plot()
         """Display a specific plot.
         
         Args:
@@ -581,43 +626,15 @@ class ResultsViewer:
             for widget in self.plot_display_frame.winfo_children():
                 widget.destroy()
             
-            # Create new figure
-            self.current_figure = Figure(figsize=(8, 6), dpi=100)
-            
-            # If plot_data is a matplotlib figure, copy it
-            if hasattr(plot_data, 'axes'):
-                # Copy the plot
-                for i, ax in enumerate(plot_data.axes):
-                    new_ax = self.current_figure.add_subplot(len(plot_data.axes), 1, i+1)
-                    # Copy basic properties
-                    new_ax.set_title(ax.get_title())
-                    new_ax.set_xlabel(ax.get_xlabel())
-                    new_ax.set_ylabel(ax.get_ylabel())
-                    
-                    # Copy plot elements (simplified)
-                    for line in ax.get_lines():
-                        new_ax.plot(line.get_xdata(), line.get_ydata(), 
-                                   color=line.get_color(), label=line.get_label())
-                    
-                    if ax.get_legend():
-                        new_ax.legend()
-            else:
-                # Create a simple plot if data format is not recognized
-                ax = self.current_figure.add_subplot(111)
-                ax.text(0.5, 0.5, f'Plot: {plot_name}', 
-                       horizontalalignment='center', verticalalignment='center',
-                       transform=ax.transAxes, fontsize=14)
-            
-            self.current_figure.tight_layout()
-            
-            # Create canvas
-            self.plot_canvas = FigureCanvasTkAgg(self.current_figure, self.plot_display_frame)
+            # Create canvas with the existing figure
+            self.plot_canvas = FigureCanvasTkAgg(plot_data, self.plot_display_frame)
             self.plot_canvas.draw()
             self.plot_canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
             
             # Create toolbar
-            self.plot_toolbar = NavigationToolbar2Tk(self.plot_canvas, self.plot_display_frame)
-            self.plot_toolbar.update()
+            from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+            self.toolbar = NavigationToolbar2Tk(self.plot_canvas, self.plot_display_frame)
+            self.toolbar.update()
             
         except Exception as e:
             self.logger.error(f"Error displaying plot {plot_name}: {str(e)}")
@@ -736,7 +753,59 @@ class ResultsViewer:
                 messagebox.showerror("Error", f"Failed to export report: {str(e)}")
     
     def _generate_html_report(self, filename: str) -> None:
-        """Generate HTML report.
+        """Generate HTML report using Apple-style generator.
+        
+        Args:
+            filename: Output filename
+        """
+        try:
+            from ..io import AppleStyleReportGenerator
+            from ..config import Config
+            
+            # Create Apple-style report generator
+            config = Config()
+            report_generator = AppleStyleReportGenerator(config)
+            
+            # Prepare data info
+            data_info = {
+                'pipeline_id': 'GUI Analysis',
+                'start_time': pd.Timestamp.now(),
+                'end_time': pd.Timestamp.now(),
+                'data_shape': (len(self.results_data), len(self.results_data.columns)) if hasattr(self, 'results_data') and self.results_data is not None else (0, 0),
+                'variables': {
+                    'dependent': [],
+                    'independent': [],
+                    'subject': None
+                }
+            }
+            
+            # Convert results to expected format
+            results = {
+                'statistical_tests': self.results_data.to_dict('records') if hasattr(self, 'results_data') and self.results_data is not None else [],
+                'quality_report': {},
+                'assumptions': {},
+                'visualizations': {},
+                'recommendations': []
+            }
+            
+            # Generate the report
+            output_path = report_generator.generate_comprehensive_report(
+                results=results,
+                data=self.results_data if hasattr(self, 'results_data') else None,
+                data_info=data_info,
+                filename=Path(filename).name,
+                output_dir=Path(filename).parent
+            )
+            
+            self.logger.info(f"Apple-style HTML report generated: {output_path}")
+            
+        except Exception as e:
+            self.logger.warning(f"Failed to generate Apple-style report, falling back to simple HTML: {str(e)}")
+            # Fallback to simple HTML generation
+            self._generate_simple_html_report(filename)
+    
+    def _generate_simple_html_report(self, filename: str) -> None:
+        """Generate simple HTML report as fallback.
         
         Args:
             filename: Output filename

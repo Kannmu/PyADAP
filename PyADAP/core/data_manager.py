@@ -5,9 +5,8 @@ with automatic type detection and quality assessment.
 """
 
 import os
-import warnings
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple, Union, Any
+from typing import Dict, List, Optional, Any
 
 import numpy as np
 import pandas as pd
@@ -15,7 +14,7 @@ from scipy import stats
 from scipy.stats import boxcox, yeojohnson
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 from sklearn.ensemble import IsolationForest
-from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.impute import SimpleImputer
 
 from ..config import Config
 from ..utils import Logger, Validator
@@ -131,7 +130,8 @@ class DataManager:
                 if len(temp_df.columns) > max_columns:
                     max_columns = len(temp_df.columns)
                     best_delimiter = delimiter
-            except:
+            except Exception as e:
+                self.logger.debug(f"Failed to read with delimiter '{delimiter}': {e}")
                 continue
         
         # Read with best parameters
@@ -157,7 +157,8 @@ class DataManager:
                         if datetime_series.notna().sum() / len(datetime_series) > 0.8:
                             self.raw_data[column] = datetime_series
                             continue
-                except:
+                except Exception as e:
+                    self.logger.debug(f"Failed to parse datetime for column {column}: {e}")
                     pass
                 
                 # Check if it's categorical
@@ -378,7 +379,8 @@ class DataManager:
         # Test original data
         try:
             _, original_p = shapiro(data.dropna())
-        except:
+        except (ValueError, RuntimeError, np.linalg.LinAlgError) as e:
+            self.logger.warning(f"Shapiro-Wilk test failed: {str(e)}")
             return None
         
         transformations = []
@@ -390,16 +392,16 @@ class DataManager:
                 log_data = np.log(data)
                 _, log_p = shapiro(log_data.dropna())
                 transformations.append(('log', log_p, log_data))
-            except:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Log transformation failed: {e}")
             
             # Box-Cox transformation
             try:
                 boxcox_data, lambda_param = boxcox(data)
                 _, boxcox_p = shapiro(boxcox_data)
                 transformations.append(('boxcox', boxcox_p, boxcox_data, lambda_param))
-            except:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Box-Cox transformation failed: {e}")
         
         if (data >= 0).all():
             # Square root transformation
@@ -407,16 +409,16 @@ class DataManager:
                 sqrt_data = np.sqrt(data)
                 _, sqrt_p = shapiro(sqrt_data.dropna())
                 transformations.append(('sqrt', sqrt_p, sqrt_data))
-            except:
-                pass
+            except Exception as e:
+                self.logger.debug(f"Square root transformation failed: {e}")
         
         # Yeo-Johnson (works with any data)
         try:
             yj_data, lambda_param = yeojohnson(data)
             _, yj_p = shapiro(yj_data)
             transformations.append(('yeo_johnson', yj_p, yj_data, lambda_param))
-        except:
-            pass
+        except Exception as e:
+                self.logger.debug(f"Yeo-Johnson transformation failed: {e}")
         
         # Find best transformation (highest p-value)
         if transformations:

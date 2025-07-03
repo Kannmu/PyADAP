@@ -13,10 +13,9 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Any, Union, Tuple
 import scipy.stats as stats
-from collections import Counter
 import warnings
 
-from ..utils import Logger, get_logger, Validator, format_number, format_p_value
+from ..utils import get_logger, Validator
 from ..config import Config
 
 # Suppress warnings
@@ -265,7 +264,7 @@ class DescriptiveAnalysis:
                 
                 # Determine if variable should be treated as categorical
                 is_categorical = (data[var].dtype in ['object', 'category'] or 
-                                data[var].nunique() <= 20)
+                                data[var].nunique() <= self.config.MAX_CATEGORICAL_UNIQUE_VALUES)
                 
                 if is_categorical:
                     value_counts = clean_data.value_counts()
@@ -301,8 +300,8 @@ class DescriptiveAnalysis:
                                 'p_value': float(chi2_p),
                                 'interpretation': 'Non-uniform distribution' if chi2_p < 0.05 else 'Approximately uniform distribution'
                             }
-                        except:
-                            pass
+                        except (ValueError, RuntimeError) as e:
+                            self.logger.debug(f"Chi-square test failed for {var}: {str(e)}")
                 
             except Exception as e:
                 self.logger.warning(f"Error in frequency analysis for {var}: {str(e)}")
@@ -365,7 +364,7 @@ class DescriptiveAnalysis:
             all_vars.extend(var_list)
         
         categorical_vars = [var for var in all_vars if var in data.columns and 
-                          (data[var].dtype in ['object', 'category'] or data[var].nunique() <= 10)]
+                          (data[var].dtype in ['object', 'category'] or data[var].nunique() <= self.config.MAX_CATEGORICAL_UNIQUE_VALUES)]
         
         # Perform pairwise cross-tabulations
         for i, var1 in enumerate(categorical_vars):
@@ -598,20 +597,20 @@ class DescriptiveAnalysis:
     def _calculate_ci_median(self, data: pd.Series, confidence: float) -> Tuple[float, float]:
         """Calculate confidence interval for median (bootstrap)."""
         try:
-            # Simple bootstrap for median CI
-            n_bootstrap = 1000
-            bootstrap_medians = []
+            # Ensure data is a 1D array for scipy.stats.bootstrap
+            data_array = data.dropna().to_numpy()
+            if len(data_array) < 2: # Bootstrap requires at least 2 data points
+                return (np.nan, np.nan)
+
+            # Use scipy.stats.bootstrap for median CI
+            # The data must be passed as a tuple of samples, hence (data_array,)
+            res = stats.bootstrap((data_array, ), np.median, confidence_level=confidence,
+                                  random_state=self.config.get('random_seed', 42),
+                                  method='percentile') # Using percentile method, BCa is default but can be slower
             
-            for _ in range(n_bootstrap):
-                sample = np.random.choice(data, size=len(data), replace=True)
-                bootstrap_medians.append(np.median(sample))
-            
-            alpha = 1 - confidence
-            lower = np.percentile(bootstrap_medians, 100 * alpha / 2)
-            upper = np.percentile(bootstrap_medians, 100 * (1 - alpha / 2))
-            
-            return (float(lower), float(upper))
-        except:
+            return (float(res.confidence_interval.low), float(res.confidence_interval.high))
+        except Exception as e:
+            self.logger.warning(f"Error calculating CI for median: {str(e)}")
             return (np.nan, np.nan)
     
     def _calculate_entropy(self, data: pd.Series) -> float:
@@ -669,11 +668,11 @@ class DescriptiveAnalysis:
                     'p_value': float(shapiro_p),
                     'interpretation': 'Normal' if shapiro_p > 0.05 else 'Non-normal'
                 }
-        except:
-            pass
+        except Exception as e:
+            self.logger.warning(f"Shapiro-Wilk test failed for series {data.name if hasattr(data, 'name') else 'Unnamed'}: {e}")
         
         try:
-            # D'Agostino's normality test
+            # D'Agostino's K-squared test (requires n >= 8, generally recommended for n > 20)
             if len(data) >= 8:
                 dagostino_stat, dagostino_p = stats.normaltest(data)
                 tests['dagostino'] = {
@@ -681,19 +680,21 @@ class DescriptiveAnalysis:
                     'p_value': float(dagostino_p),
                     'interpretation': 'Normal' if dagostino_p > 0.05 else 'Non-normal'
                 }
-        except:
-            pass
+        except Exception as e:
+            self.logger.warning(f"D'Agostino's test failed for series {data.name if hasattr(data, 'name') else 'Unnamed'}: {e}")
         
         try:
-            # Jarque-Bera test
-            jb_stat, jb_p = stats.jarque_bera(data)
-            tests['jarque_bera'] = {
-                'statistic': float(jb_stat),
-                'p_value': float(jb_p),
-                'interpretation': 'Normal' if jb_p > 0.05 else 'Non-normal'
-            }
-        except:
-            pass
+            # Jarque-Bera test (more reliable for larger samples, e.g., n > 20 or n > 50)
+            # Scipy's implementation can run with n >= 2, but its power is low for small samples.
+            if len(data) >= 2: # Minimum requirement for scipy's jarque_bera
+                jb_stat, jb_p = stats.jarque_bera(data)
+                tests['jarque_bera'] = {
+                    'statistic': float(jb_stat),
+                    'p_value': float(jb_p),
+                    'interpretation': 'Normal' if jb_p > 0.05 else 'Non-normal'
+                }
+        except Exception as e:
+            self.logger.warning(f"Jarque-Bera test failed for series {data.name if hasattr(data, 'name') else 'Unnamed'}: {e}")
         
         return tests
     
@@ -710,13 +711,19 @@ class DescriptiveAnalysis:
                 params = dist.fit(data)
                 
                 # Kolmogorov-Smirnov test
+                # IMPORTANT: When distribution parameters are estimated from the data (as done here with dist.fit),
+                # the standard K-S test p-values are not strictly valid and tend to be conservative (i.e., p-values are too large).
+                # This may lead to incorrectly accepting the fitted distribution.
+                # For normality, Lilliefors test is a correction. For other distributions, specific tests or Monte Carlo simulation for p-value correction might be needed.
+                # Consider results with caution or use other goodness-of-fit tests like Anderson-Darling if available and appropriate.
                 ks_stat, ks_p = stats.kstest(data, lambda x: dist.cdf(x, *params))
                 
                 distributions[dist_name] = {
                     'parameters': [float(p) for p in params],
                     'ks_statistic': float(ks_stat),
                     'ks_p_value': float(ks_p),
-                    'goodness_of_fit': 'Good' if ks_p > 0.05 else 'Poor'
+                    'goodness_of_fit': 'Good' if ks_p > 0.05 else 'Poor',
+                    'ks_test_note': 'P-value may be conservative as parameters are estimated from data.'
                 }
             except:
                 continue
@@ -853,7 +860,7 @@ class DescriptiveAnalysis:
         if series.dtype in ['int64', 'float64']:
             return 'numeric'
         elif series.dtype in ['object', 'category']:
-            if series.nunique() <= 10:
+            if series.nunique() <= self.config.MAX_CATEGORICAL_UNIQUE_VALUES:
                 return 'categorical'
             else:
                 return 'text'

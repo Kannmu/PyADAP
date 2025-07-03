@@ -6,11 +6,10 @@ analysis parameters, data processing options, and visualization settings.
 
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
-from typing import Optional, Dict, Any
 from pathlib import Path
 
 from ..config import Config
-from ..utils import Logger, get_logger
+from ..utils import get_logger
 
 
 class ConfigDialog:

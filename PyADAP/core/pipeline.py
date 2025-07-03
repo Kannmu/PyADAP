@@ -4,21 +4,19 @@ This module provides an intelligent, automated analysis pipeline that integrates
 data management, statistical analysis, and reporting with minimal user intervention.
 """
 
-import os
 import json
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 
 import pandas as pd
-import numpy as np
 
 from .data_manager import DataManager
-from .statistical_analyzer import StatisticalAnalyzer, StatisticalResult
+from .statistical_analyzer import StatisticalAnalyzer
 from ..config import Config
 from ..utils import Logger, Validator
 from ..visualization import PlotManager
-from ..io import ReportGenerator, DataExporter
+from ..io import AppleStyleReportGenerator, DataExporter
 
 
 class AnalysisPipeline:
@@ -38,7 +36,7 @@ class AnalysisPipeline:
         self.data_manager = DataManager(self.config)
         self.statistical_analyzer = StatisticalAnalyzer(self.config)
         self.plot_manager = PlotManager(self.config)
-        self.report_generator = ReportGenerator(self.config)
+        self.report_generator = AppleStyleReportGenerator(self.config)
         self.data_exporter = DataExporter(self.config)
         
         # Pipeline state
@@ -60,14 +58,22 @@ class AnalysisPipeline:
         # Output paths
         self.output_dir: Optional[Path] = None
         
-    def set_data(self, data: pd.DataFrame) -> None:
+    def set_data(self, data: pd.DataFrame, file_path: Optional[str] = None) -> None:
         """Set data for analysis.
         
         Args:
             data: DataFrame containing the data to analyze
+            file_path: Optional path to the source data file
         """
         self.data_manager.raw_data = data
         self.data_manager.processed_data = None  # Reset processed data
+        
+        # Set file path in metadata if provided
+        if file_path:
+            self.data_manager.metadata['file_path'] = file_path
+            # Update pipeline ID to reflect the new data file
+            self.pipeline_id = self._generate_pipeline_id(file_path)
+            
         # Generate quality report for the new data
         self.data_manager._generate_quality_report()
         
@@ -106,9 +112,12 @@ class AnalysisPipeline:
         if data_file:
             # Extract filename without extension
             file_stem = Path(data_file).stem
-            # Clean filename for use in directory name
-            clean_name = "".join(c for c in file_stem if c.isalnum() or c in ('-', '_')).rstrip()
-            return f"PyADAP_{clean_name}_{timestamp}"
+            # Clean filename for use in directory name - more permissive cleaning
+            clean_name = "".join(c for c in file_stem if c.isalnum() or c in ('-', '_', '.')).rstrip()
+            # Ensure clean_name is not empty
+            if not clean_name:
+                clean_name = "data"
+            return f"{clean_name}_{timestamp}"
         else:
             return f"PyADAP_Analysis_{timestamp}"
     
@@ -134,8 +143,15 @@ class AnalysisPipeline:
         self.status = "running"
         
         try:
-            # Setup output directory
-            self._setup_output_directory(output_dir)
+            # Get data file from data_manager if available
+            data_file = getattr(self.data_manager, 'metadata', {}).get('file_path', None)
+            
+            # Generate pipeline ID based on data file
+            if data_file:
+                self.pipeline_id = self._generate_pipeline_id(data_file)
+            
+            # Setup output directory with correct pipeline ID
+            self._setup_output_directory(output_dir, data_file)
             
             # Set variables and validate (data should already be loaded)
             self.logger.info("Setting variables and validating...")
@@ -202,8 +218,11 @@ class AnalysisPipeline:
         self.status = "running"
         
         try:
-            # Setup output directory
-            self._setup_output_directory(output_dir)
+            # Generate pipeline ID first based on data file
+            self.pipeline_id = self._generate_pipeline_id(data_file)
+            
+            # Setup output directory with the correct pipeline ID
+            self._setup_output_directory(output_dir, data_file)
             
             # Step 1: Load and preprocess data
             self.logger.info("Step 1: Loading and preprocessing data...")
@@ -250,13 +269,31 @@ class AnalysisPipeline:
             self.logger.error(f"Pipeline failed: {str(e)}")
             raise
     
-    def _setup_output_directory(self, output_dir: Optional[str]) -> None:
-        """Setup output directory for results."""
+    def _setup_output_directory(self, output_dir: Optional[str], data_file: Optional[str] = None) -> None:
+        """Setup output directory for results.
+        
+        Args:
+            output_dir: Custom output directory path
+            data_file: Path to the data file being analyzed
+        """
         if output_dir:
             self.output_dir = Path(output_dir)
+        elif data_file:
+            # Create output directory in the same directory as the data file
+            # Named using the pipeline_id (original filename + timestamp)
+            data_path = Path(data_file)
+            data_dir = data_path.parent
+            # Use the pipeline_id which includes timestamp
+            self.output_dir = data_dir / self.pipeline_id
         else:
-            # Create output directory in current working directory
+            # Fallback to current working directory
             self.output_dir = Path.cwd() / "PyADAP_Results" / self.pipeline_id
+        
+        # Remove existing directory contents if it exists
+        if self.output_dir.exists():
+            import shutil
+            shutil.rmtree(self.output_dir)
+            self.logger.info(f"Removed existing output directory: {self.output_dir}")
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
@@ -270,24 +307,6 @@ class AnalysisPipeline:
     
     def _load_and_preprocess_data(self, data_file: str, **kwargs) -> None:
         """Load and preprocess data."""
-        # Update pipeline ID with data file name
-        self.pipeline_id = self._generate_pipeline_id(data_file)
-        
-        # Re-setup output directory with new pipeline ID
-        if hasattr(self, 'output_dir') and self.output_dir:
-            # Get the parent directory (PyADAP_Results)
-            parent_dir = self.output_dir.parent
-            # Create new output directory with updated pipeline ID
-            self.output_dir = parent_dir / self.pipeline_id
-            self.output_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Create subdirectories
-            (self.output_dir / "data").mkdir(exist_ok=True)
-            (self.output_dir / "plots").mkdir(exist_ok=True)
-            (self.output_dir / "reports").mkdir(exist_ok=True)
-            (self.output_dir / "exports").mkdir(exist_ok=True)
-            
-            self.logger.info(f"Output directory updated: {self.output_dir}")
         
         # Load data
         raw_data = self.data_manager.load_data(data_file, **kwargs)
@@ -569,84 +588,110 @@ class AnalysisPipeline:
     def _generate_visualizations(self) -> None:
         """Generate comprehensive visualizations."""
         if not self.config.visualization.generate_plots:
+            self.logger.info("Plot generation is disabled in the configuration.")
+            self.results['plots'] = {}
+            self.results['visualizations'] = {}
             return
         
-        visualization_results = {}
+        visualization_results: Dict[str, Figure] = {}
+        plot_figures: Dict[str, Figure] = {} # Explicitly for Figure objects
         
         # Get current data
         current_data = self.statistical_analyzer.data
-        
+        if current_data is None or current_data.empty:
+            self.logger.warning("No data available for generating visualizations.")
+            self.results['plots'] = {}
+            self.results['visualizations'] = {}
+            return
+
+        # Ensure output directory for plots exists
+        plots_output_dir = self.output_dir / "plots"
+        plots_output_dir.mkdir(parents=True, exist_ok=True)
+
         # Generate plots for each DV-IV combination
         for dv in self.data_manager.dependent_vars:
             for iv in self.data_manager.independent_vars:
-                plot_key = f"{dv}_by_{iv}"
+                plot_key_base = f"{dv}_by_{iv}"
                 
                 try:
-                    # Determine plot type based on variable types
                     iv_type = self._get_variable_type(current_data, iv)
                     dv_type = self._get_variable_type(current_data, dv)
                     
                     if dv_type == 'continuous' and iv_type == 'categorical':
-                        # Box plot or violin plot
-                        plot_path = self.plot_manager.create_comparison_plot(
+                        # Box plot
+                        fig_box = self.plot_manager.create_comparison_plot(
                             data=current_data,
                             dependent_var=dv,
                             independent_var=iv,
                             plot_type='box',
-                            save_path=self.output_dir / "plots" / f"{plot_key}_boxplot.png"
+                            save_path=plots_output_dir / f"{plot_key_base}_boxplot.png"
                         )
-                        visualization_results[f"{plot_key}_boxplot"] = str(plot_path)
+                        if fig_box:
+                            plot_figures[f"{plot_key_base}_boxplot"] = fig_box
+                            visualization_results[f"{plot_key_base}_boxplot"] = str(plots_output_dir / f"{plot_key_base}_boxplot.png")
                         
                         # Distribution plot
-                        plot_path = self.plot_manager.create_distribution_plot(
+                        # Assuming create_distribution_plot also returns a Figure and handles saving
+                        fig_dist = self.plot_manager.create_distribution_plot(
                             data=current_data,
                             variable=dv,
                             group_by=iv,
-                            save_path=self.output_dir / "plots" / f"{plot_key}_distribution.png"
+                            save_path=plots_output_dir / f"{plot_key_base}_distribution.png"
                         )
-                        visualization_results[f"{plot_key}_distribution"] = str(plot_path)
+                        if fig_dist:
+                            plot_figures[f"{plot_key_base}_distribution"] = fig_dist
+                            visualization_results[f"{plot_key_base}_distribution"] = str(plots_output_dir / f"{plot_key_base}_distribution.png")
                     
                     elif dv_type == 'continuous' and iv_type == 'continuous':
                         # Scatter plot
-                        plot_path = self.plot_manager.create_scatter_plot(
+                        # Assuming create_scatter_plot also returns a Figure and handles saving
+                        fig_scatter = self.plot_manager.create_scatter_plot(
                             data=current_data,
                             x_var=iv,
                             y_var=dv,
-                            save_path=self.output_dir / "plots" / f"{plot_key}_scatter.png"
+                            save_path=plots_output_dir / f"{plot_key_base}_scatter.png"
                         )
-                        visualization_results[f"{plot_key}_scatter"] = str(plot_path)
+                        if fig_scatter:
+                            plot_figures[f"{plot_key_base}_scatter"] = fig_scatter
+                            visualization_results[f"{plot_key_base}_scatter"] = str(plots_output_dir / f"{plot_key_base}_scatter.png")
                     
                     elif dv_type == 'categorical' and iv_type == 'categorical':
                         # Contingency table heatmap
-                        plot_path = self.plot_manager.create_contingency_plot(
+                        # Assuming create_contingency_plot also returns a Figure and handles saving
+                        fig_contingency = self.plot_manager.create_contingency_plot(
                             data=current_data,
                             var1=dv,
                             var2=iv,
-                            save_path=self.output_dir / "plots" / f"{plot_key}_contingency.png"
+                            save_path=plots_output_dir / f"{plot_key_base}_contingency.png"
                         )
-                        visualization_results[f"{plot_key}_contingency"] = str(plot_path)
+                        if fig_contingency:
+                            plot_figures[f"{plot_key_base}_contingency"] = fig_contingency
+                            visualization_results[f"{plot_key_base}_contingency"] = str(plots_output_dir / f"{plot_key_base}_contingency.png")
                 
                 except Exception as e:
-                    self.logger.warning(f"Failed to create plot for {plot_key}: {str(e)}")
+                    self.logger.warning(f"Failed to create plot for {plot_key_base}: {str(e)}")
                     continue
         
         # Generate summary plots
         try:
-            # Correlation matrix for continuous variables
             continuous_vars = [var for var in self.data_manager.dependent_vars + self.data_manager.independent_vars
                              if self._get_variable_type(current_data, var) == 'continuous']
             
             if len(continuous_vars) > 1:
-                plot_path = self.plot_manager.create_correlation_matrix(
+                # Assuming create_correlation_matrix also returns a Figure and handles saving
+                fig_corr = self.plot_manager.create_correlation_matrix(
                     data=current_data[continuous_vars],
-                    save_path=self.output_dir / "plots" / "correlation_matrix.png"
+                    save_path=plots_output_dir / "correlation_matrix.png"
                 )
-                visualization_results['correlation_matrix'] = str(plot_path)
+                if fig_corr:
+                    plot_figures['correlation_matrix'] = fig_corr
+                    visualization_results['correlation_matrix'] = str(plots_output_dir / "correlation_matrix.png")
         
         except Exception as e:
             self.logger.warning(f"Failed to create correlation matrix: {str(e)}")
         
-        self.results['visualizations'] = visualization_results
+        self.results['visualizations'] = visualization_results # Keep paths for reports
+        self.results['plots'] = plot_figures  # Store Figure objects for GUI
     
     def _get_variable_type(self, data: pd.DataFrame, var_name: str) -> str:
         """Determine variable type."""
@@ -727,10 +772,10 @@ class AnalysisPipeline:
         
         # Generate HTML report in the reports subdirectory
         html_filename = f"{self.pipeline_id}_report.html"
-        html_report_path = self.report_generator.generate_analysis_report(
+        html_report_path = self.report_generator.generate_comprehensive_report(
             results=self.results,
+            data=self.data_manager.processed_data,
             data_info=data_info,
-            output_format="html",
             filename=html_filename,
             output_dir=self.output_dir / "reports"
         )

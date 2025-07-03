@@ -6,16 +6,17 @@ and statistical assumptions.
 
 import numpy as np
 import pandas as pd
-from typing import Any, List, Dict, Union, Optional, Tuple, Callable
+from typing import Any, List, Dict, Union, Optional
 from pathlib import Path
 import warnings
 from scipy import stats
-from sklearn.preprocessing import LabelEncoder
+from .constants import (
+    DEFAULT_ALPHA, MIN_SAMPLE_SIZE, PERCENTAGE_MULTIPLIER
+)
 
 
 class ValidationError(Exception):
     """Custom exception for validation errors."""
-    pass
 
 
 class Validator:
@@ -145,7 +146,7 @@ class Validator:
         return columns
     
     @staticmethod
-    def validate_sample_size(df: pd.DataFrame, min_size: int = 3, 
+    def validate_sample_size(df: pd.DataFrame, min_size: int = MIN_SAMPLE_SIZE, 
                            group_column: Optional[str] = None) -> bool:
         """Validate sample size requirements.
         
@@ -283,7 +284,7 @@ class Validator:
     
     @staticmethod
     def validate_normality_assumption(data: Union[pd.Series, np.ndarray],
-                                    alpha: float = 0.05,
+                                    alpha: float = DEFAULT_ALPHA,
                                     test: str = "shapiro") -> Dict[str, Any]:
         """Validate normality assumption.
         
@@ -338,7 +339,7 @@ class Validator:
     
     @staticmethod
     def validate_homogeneity_assumption(groups: List[Union[pd.Series, np.ndarray]],
-                                      alpha: float = 0.05,
+                                      alpha: float = DEFAULT_ALPHA,
                                       test: str = "levene") -> Dict[str, Any]:
         """Validate homogeneity of variance assumption.
         
@@ -503,17 +504,19 @@ class Validator:
         # Calculate correlation matrix
         corr_matrix = df[columns].corr()
         
-        # Find high correlations (excluding diagonal)
+        # Find high correlations (excluding diagonal) using vectorized operations
         high_corr_pairs = []
-        for i in range(len(columns)):
-            for j in range(i+1, len(columns)):
-                corr_val = abs(corr_matrix.iloc[i, j])
-                if corr_val > threshold:
-                    high_corr_pairs.append({
-                        'var1': columns[i],
-                        'var2': columns[j],
-                        'correlation': corr_matrix.iloc[i, j]
-                    })
+        # Get upper triangle indices (excluding diagonal)
+        upper_tri_indices = np.triu_indices_from(corr_matrix, k=1)
+        
+        for i, j in zip(*upper_tri_indices):
+            corr_val = abs(corr_matrix.iloc[i, j])
+            if corr_val > threshold:
+                high_corr_pairs.append({
+                    'var1': columns[i],
+                    'var2': columns[j],
+                    'correlation': corr_matrix.iloc[i, j]
+                })
         
         result = {
             "assumption_met": len(high_corr_pairs) == 0,
@@ -572,7 +575,7 @@ class Validator:
         
         result.update({
             "outlier_count": len(outliers),
-            "outlier_percentage": len(outliers) / len(data_clean) * 100,
+            "outlier_percentage": len(outliers) / len(data_clean) * PERCENTAGE_MULTIPLIER,
             "outlier_indices": outliers.index.tolist() if hasattr(outliers, 'index') else [],
             "outlier_values": outliers.tolist()
         })

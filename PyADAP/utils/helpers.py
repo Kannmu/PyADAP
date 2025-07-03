@@ -6,13 +6,16 @@ formatting, and common operations.
 
 import numpy as np
 import pandas as pd
-from typing import Union, Optional, Tuple, Dict, Any, List
+from typing import Union, Optional, Dict, Any
 from pathlib import Path
 import re
 import os
-from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler, RobustScaler
 import warnings
+from .constants import (
+    DEFAULT_ALPHA, PERCENTAGE_MULTIPLIER, DEFAULT_BOOTSTRAP_SAMPLES,
+    CATEGORICAL_UNIQUE_RATIO_THRESHOLD, MAX_FILENAME_LENGTH
+)
 
 
 def normalize_data(data: Union[pd.Series, np.ndarray], 
@@ -156,7 +159,7 @@ def calculate_correlation_effect_size(r: float, n: int) -> Dict[str, float]:
         "r": r,
         "r_squared": r_squared,
         "magnitude": magnitude,
-        "variance_explained": r_squared * 100
+        "variance_explained": r_squared * PERCENTAGE_MULTIPLIER
     }
 
 
@@ -205,12 +208,12 @@ def format_number(number: float, decimal_places: int = 3,
 def format_confidence_interval(lower: float, upper: float, 
                               confidence_level: float = 0.95,
                               decimal_places: int = 3) -> str:
-    """Format confidence interval for reporting.
+    """Format confidence interval for display.
     
     Args:
         lower: Lower bound
         upper: Upper bound
-        confidence_level: Confidence level (e.g., 0.95 for 95%)
+        confidence_level: Confidence level (default: 0.95)
         decimal_places: Number of decimal places
         
     Returns:
@@ -219,14 +222,43 @@ def format_confidence_interval(lower: float, upper: float,
     if pd.isna(lower) or pd.isna(upper):
         return "NaN"
     
-    percentage = int(confidence_level * 100)
+    percentage = int(confidence_level * PERCENTAGE_MULTIPLIER)
     lower_str = format_number(lower, decimal_places)
     upper_str = format_number(upper, decimal_places)
     
-    return f"{percentage}% CI [{lower_str}, {upper_str}]"
+    return f"{percentage}% CI: [{lower_str}, {upper_str}]"
 
 
-def create_safe_filename(filename: str, max_length: int = 255) -> str:
+def format_cell_value(value: Any, max_length: int = 30) -> str:
+    """Format a cell value for display.
+    
+    Args:
+        value: Value to format
+        max_length: Maximum length for string truncation
+        
+    Returns:
+        Formatted string
+    """
+    if pd.isnull(value):
+        return "NaN"
+    
+    if isinstance(value, (int, float)):
+        if isinstance(value, float) and abs(value) < 1e-3:
+            return f"{value:.2e}"
+        elif isinstance(value, float):
+            return f"{value:.4f}"
+        else:
+            return str(value)
+    
+    # Truncate long strings
+    str_val = str(value)
+    if len(str_val) > max_length:
+        return str_val[:max_length-3] + "..."
+    
+    return str_val
+
+
+def create_safe_filename(filename: str, max_length: int = MAX_FILENAME_LENGTH) -> str:
     """Create a safe filename by removing/replacing invalid characters.
     
     Args:
@@ -291,7 +323,7 @@ def get_memory_usage(obj: Any) -> float:
 
 
 def detect_data_types(df: pd.DataFrame, 
-                     sample_size: Optional[int] = 1000) -> Dict[str, str]:
+                     sample_size: Optional[int] = DEFAULT_BOOTSTRAP_SAMPLES) -> Dict[str, str]:
     """Automatically detect appropriate data types for DataFrame columns.
     
     Args:
@@ -346,7 +378,7 @@ def detect_data_types(df: pd.DataFrame,
         unique_count = series.nunique()
         total_count = len(series)
         
-        if unique_count <= 20 or unique_count / total_count < 0.05:
+        if unique_count <= 20 or unique_count / total_count < CATEGORICAL_UNIQUE_RATIO_THRESHOLD:
             suggestions[col] = "categorical"
         else:
             suggestions[col] = "text"
@@ -411,7 +443,7 @@ def calculate_missing_data_summary(df: pd.DataFrame) -> pd.DataFrame:
     missing_summary = pd.DataFrame({
         'Column': df.columns,
         'Missing_Count': df.isnull().sum(),
-        'Missing_Percentage': (df.isnull().sum() / len(df)) * 100,
+        'Missing_Percentage': (df.isnull().sum() / len(df)) * PERCENTAGE_MULTIPLIER,
         'Data_Type': df.dtypes,
         'Non_Missing_Count': df.count(),
         'Unique_Values': [df[col].nunique() for col in df.columns]
@@ -476,7 +508,7 @@ def create_correlation_matrix(df: pd.DataFrame,
 
 def bootstrap_statistic(data: Union[pd.Series, np.ndarray],
                        statistic_func: callable,
-                       n_bootstrap: int = 1000,
+                       n_bootstrap: int = DEFAULT_BOOTSTRAP_SAMPLES,
                        confidence_level: float = 0.95,
                        random_state: Optional[int] = None) -> Dict[str, float]:
     """Calculate bootstrap confidence intervals for a statistic.
@@ -513,8 +545,8 @@ def bootstrap_statistic(data: Union[pd.Series, np.ndarray],
     
     # Calculate confidence intervals
     alpha = 1 - confidence_level
-    lower_percentile = (alpha / 2) * 100
-    upper_percentile = (1 - alpha / 2) * 100
+    lower_percentile = (alpha / 2) * PERCENTAGE_MULTIPLIER
+    upper_percentile = (1 - alpha / 2) * PERCENTAGE_MULTIPLIER
     
     lower_ci = np.percentile(bootstrap_stats, lower_percentile)
     upper_ci = np.percentile(bootstrap_stats, upper_percentile)
@@ -530,7 +562,7 @@ def bootstrap_statistic(data: Union[pd.Series, np.ndarray],
 
 def calculate_sample_size_recommendation(effect_size: float,
                                        power: float = 0.8,
-                                       alpha: float = 0.05,
+                                       alpha: float = DEFAULT_ALPHA,
                                        test_type: str = "t_test") -> Dict[str, Any]:
     """Calculate recommended sample size for given parameters.
     

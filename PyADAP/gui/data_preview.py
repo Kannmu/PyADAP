@@ -8,10 +8,10 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 import pandas as pd
 import numpy as np
-from typing import Optional, Dict, Any, List
-from pathlib import Path
+from typing import Optional, Any
 
-from ..utils import Logger, get_logger, format_number
+from ..utils import get_logger
+from ..utils.helpers import format_cell_value, format_number
 
 
 class DataPreviewWidget:
@@ -535,23 +535,7 @@ class DataPreviewWidget:
         Returns:
             Formatted string
         """
-        if pd.isnull(value):
-            return "NaN"
-        
-        if isinstance(value, (int, float)):
-            if isinstance(value, float) and abs(value) < 1e-3:
-                return f"{value:.2e}"
-            elif isinstance(value, float):
-                return f"{value:.4f}"
-            else:
-                return str(value)
-        
-        # Truncate long strings
-        str_val = str(value)
-        if len(str_val) > 50:
-            return str_val[:47] + "..."
-        
-        return str_val
+        return format_cell_value(value, max_length=50)
     
     def _go_first(self) -> None:
         """Go to first page."""

@@ -8,15 +8,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
-from typing import Dict, List, Optional, Tuple, Any, Union
+from typing import Dict, List, Optional, Any
 from matplotlib.figure import Figure
-from matplotlib.axes import Axes
 import scipy.stats as stats
-from scipy.stats import shapiro, normaltest, jarque_bera, anderson
+from scipy.stats import shapiro, normaltest, jarque_bera
 from sklearn.preprocessing import StandardScaler
 import warnings
 
-from ..utils import Logger, get_logger, format_number, format_p_value
+from ..utils import get_logger, format_number, format_p_value
 from ..config import Config
 
 # Suppress warnings
@@ -105,7 +104,7 @@ class DiagnosticPlots:
         # Limit to reasonable number of variables
         if len(numeric_vars) > 6:
             numeric_vars = numeric_vars[:6]
-            self.logger.warning(f"Limited normality plots to first 6 numeric variables")
+            self.logger.warning("Limited normality plots to first 6 numeric variables")
         
         # Create normality diagnostic plots
         n_vars = len(numeric_vars)
@@ -147,24 +146,24 @@ class DiagnosticPlots:
                     try:
                         shapiro_stat, shapiro_p = shapiro(clean_data)
                         test_results.append(f'Shapiro: p={format_p_value(shapiro_p)}')
-                    except:
-                        pass
+                    except Exception as e:
+                        self.logger.warning(f"Shapiro-Wilk test failed for {var}: {e}")
                 
                 # D'Agostino's normality test
                 if len(clean_data) >= 8:
                     try:
                         dagostino_stat, dagostino_p = normaltest(clean_data)
                         test_results.append(f"D'Agostino: p={format_p_value(dagostino_p)}")
-                    except:
-                        pass
+                    except Exception as e:
+                        self.logger.warning(f"D'Agostino's test failed for {var}: {e}")
                 
                 # Jarque-Bera test
                 if len(clean_data) >= 2:
                     try:
                         jb_stat, jb_p = jarque_bera(clean_data)
                         test_results.append(f'Jarque-Bera: p={format_p_value(jb_p)}')
-                    except:
-                        pass
+                    except Exception as e:
+                        self.logger.warning(f"Jarque-Bera test failed for {var}: {e}")
                 
                 # Add test results to plot
                 if test_results:
@@ -221,8 +220,8 @@ class DiagnosticPlots:
                 # Add KDE
                 try:
                     clean_data.plot.kde(ax=ax, color='green', linewidth=2, label='KDE')
-                except:
-                    pass
+                except Exception as e:
+                    self.logger.warning(f"KDE plot failed for {var}: {e}")
                 
                 ax.set_title(f'Distribution: {var}')
                 ax.set_xlabel(var)
@@ -417,7 +416,7 @@ class DiagnosticPlots:
                         clean_data = data[[dep_var, indep_var]].dropna()
                         
                         if len(clean_data) < 3:
-                            ax.text(0.5, 0.5, f'Insufficient data', 
+                            ax.text(0.5, 0.5, 'Insufficient data', 
                                    ha='center', va='center', transform=ax.transAxes)
                             continue
                         
@@ -432,8 +431,8 @@ class DiagnosticPlots:
                             z = np.polyfit(x, y, 1)
                             p = np.poly1d(z)
                             ax.plot(x, p(x), "r--", alpha=0.8, linewidth=2, label='Linear')
-                        except:
-                            pass
+                        except Exception as e:
+                            self.logger.warning(f"Linear regression line failed for {indep_var} vs {dep_var}: {e}")
                         
                         # LOWESS smooth line
                         try:
@@ -451,8 +450,8 @@ class DiagnosticPlots:
                                 if window_length >= 3:
                                     y_smooth = savgol_filter(y_sorted, window_length, 2)
                                     ax.plot(x_sorted, y_smooth, 'g-', linewidth=2, label='LOWESS')
-                        except:
-                            pass
+                        except Exception as e:
+                            self.logger.warning(f"LOWESS smoothing failed for {indep_var} vs {dep_var}: {e}")
                         
                         ax.set_xlabel(indep_var)
                         ax.set_ylabel(dep_var)
@@ -466,8 +465,8 @@ class DiagnosticPlots:
                             ax.text(0.02, 0.98, f'r = {correlation:.3f}', 
                                    transform=ax.transAxes, verticalalignment='top',
                                    bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
-                        except:
-                            pass
+                        except Exception as e:
+                            self.logger.warning(f"Correlation calculation failed for {indep_var} vs {dep_var}: {e}")
                         
                     except Exception as e:
                         ax.text(0.5, 0.5, f'Error plotting {indep_var}\n{str(e)}', 
@@ -563,7 +562,8 @@ class DiagnosticPlots:
                         ax2.set_ylabel('Residuals')
                         ax2.set_title('Residuals vs Order')
                         ax2.grid(True, alpha=0.3)
-                    except:
+                    except Exception as e:
+                        self.logger.warning(f"Could not compute residuals for {var1} vs {var2}: {e}")
                         ax2.text(0.5, 0.5, 'Could not compute residuals', 
                                 ha='center', va='center', transform=ax2.transAxes)
                 else:
@@ -646,7 +646,8 @@ class DiagnosticPlots:
                         else:
                             ax4.text(0.5, 0.5, 'Insufficient residuals', 
                                     ha='center', va='center', transform=ax4.transAxes)
-                    except:
+                    except Exception as e:
+                        self.logger.warning(f"Could not compute residuals for Durbin-Watson test ({var1} vs {var2}): {e}")
                         ax4.text(0.5, 0.5, 'Could not compute residuals', 
                                 ha='center', va='center', transform=ax4.transAxes)
                 else:
@@ -690,7 +691,7 @@ class DiagnosticPlots:
         # Limit to reasonable number of variables
         if len(numeric_vars) > 6:
             numeric_vars = numeric_vars[:6]
-            self.logger.warning(f"Limited outlier plots to first 6 numeric variables")
+            self.logger.warning("Limited outlier plots to first 6 numeric variables")
         
         # Create outlier diagnostic plots
         n_vars = len(numeric_vars)
@@ -877,6 +878,7 @@ class DiagnosticPlots:
                             ha='center', va='center', transform=ax3.transAxes)
                     
             except Exception as e:
+                self.logger.warning(f"VIF calculation failed: {e}")
                 ax3.text(0.5, 0.5, f'VIF calculation error:\n{str(e)}', 
                         ha='center', va='center', transform=ax3.transAxes)
             
@@ -908,6 +910,7 @@ class DiagnosticPlots:
                             bbox=dict(boxstyle='round', facecolor='yellow', alpha=0.8))
                 
             except Exception as e:
+                self.logger.warning(f"Eigenvalue calculation failed: {e}")
                 ax4.text(0.5, 0.5, f'Eigenvalue calculation error:\n{str(e)}', 
                         ha='center', va='center', transform=ax4.transAxes)
             

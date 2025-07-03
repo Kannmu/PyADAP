@@ -7,21 +7,21 @@ and validation for statistical analysis parameters.
 import json
 import os
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional
 from pathlib import Path
+from .utils.constants import (
+    DEFAULT_ALPHA, DEFAULT_BOOTSTRAP_SAMPLES, EFFECT_SIZE_THRESHOLDS,
+    DEFAULT_POWER, Z_SCORE_THRESHOLD
+)
 
 
 @dataclass
 class StatisticalConfig:
     """Statistical analysis configuration."""
-    alpha: float = 0.05
-    power: float = 0.8
+    alpha: float = DEFAULT_ALPHA
+    power: float = DEFAULT_POWER
     min_effect_size: float = 0.2
-    effect_size_thresholds: Dict[str, Dict[str, float]] = field(default_factory=lambda: {
-        'cohens_d': {'small': 0.2, 'medium': 0.5, 'large': 0.8},
-        'eta_squared': {'small': 0.01, 'medium': 0.06, 'large': 0.14},
-        'omega_squared': {'small': 0.01, 'medium': 0.06, 'large': 0.14}
-    })
+    effect_size_thresholds: Dict[str, Dict[str, float]] = field(default_factory=lambda: EFFECT_SIZE_THRESHOLDS)
     auto_test_selection: bool = True
     prefer_nonparametric: bool = False
     use_robust_tests: bool = False
@@ -30,12 +30,12 @@ class StatisticalConfig:
     check_homogeneity: bool = True
     check_independence: bool = True
     use_bootstrap: bool = False
-    bootstrap_n_samples: int = 1000
+    bootstrap_n_samples: int = DEFAULT_BOOTSTRAP_SAMPLES
     normality_tests: List[str] = field(default_factory=lambda: ['shapiro', 'anderson', 'kstest'])
     sphericity_correction: str = 'greenhouse_geisser'  # 'greenhouse_geisser', 'huynh_feldt', 'lower_bound'
     multiple_comparisons: str = 'bonferroni'  # 'bonferroni', 'holm', 'fdr_bh', 'fdr_by'
     outlier_method: str = 'iqr'  # 'iqr', 'zscore', 'modified_zscore', 'isolation_forest'
-    outlier_threshold: float = 3.0
+    outlier_threshold: float = Z_SCORE_THRESHOLD
     
     # Backward compatibility property
     @property
@@ -67,6 +67,7 @@ class DataConfig:
     scaling_method: str = 'zscore'  # 'zscore', 'minmax', 'robust', 'none'
     # Categorical encoding
     encoding_categorical: str = 'auto'  # 'auto', 'dummy', 'effect', 'ordinal'
+    MAX_CATEGORICAL_UNIQUE_VALUES: int = 20  # Maximum unique values for a column to be considered categorical by default
     
     # Properties for backward compatibility
     @property
@@ -92,25 +93,27 @@ class DataConfig:
     @property
     def outlier_method(self) -> str:
         """Get outlier method from statistical config."""
-        # This will be accessed from statistical config
+        # Return default value since DataConfig doesn't have access to statistical config
         return 'iqr'  # Default fallback
     
     @outlier_method.setter
     def outlier_method(self, value: str) -> None:
         """Set outlier method (for backward compatibility)."""
-        # Note: This is a compatibility setter, actual outlier_method is in StatisticalConfig
+        # Note: This is a placeholder for backward compatibility
+        # The actual outlier method should be set on the statistical config
         pass
     
     @property
     def outlier_threshold(self) -> float:
         """Get outlier threshold from statistical config."""
-        # This will be accessed from statistical config
-        return 3.0  # Default fallback
+        # Return default value since DataConfig doesn't have access to statistical config
+        return 3.0  # Default threshold
     
     @outlier_threshold.setter
     def outlier_threshold(self, value: float) -> None:
         """Set outlier threshold (for backward compatibility)."""
-        # Note: This is a compatibility setter, actual outlier_threshold is in StatisticalConfig
+        # Note: This is a placeholder for backward compatibility
+        # The actual outlier threshold should be set on the statistical config
         pass
     
     @property
@@ -141,7 +144,7 @@ class VisualizationConfig:
     generate_plots: bool = True
     # Plot style and appearance
     style: str = 'seaborn-v0_8-whitegrid'
-    palette: str = 'husl'
+    palette: str = 'greens'
     figure_size: tuple = (10, 6)
     dpi: int = 300
     font_family: str = 'Arial'
@@ -178,6 +181,19 @@ class VisualizationConfig:
     
 
 @dataclass
+class AnalysisConfig:
+    """Analysis configuration."""
+    apply_transformations: bool = True
+    transformation_method: str = 'auto'  # 'auto', 'log', 'sqrt', 'boxcox', 'yeo_johnson'
+    handle_outliers: bool = True
+    outlier_method: str = 'iqr'  # 'iqr', 'zscore', 'modified_zscore'
+    outlier_threshold: float = Z_SCORE_THRESHOLD
+    use_nonparametric: bool = True
+    use_robust_methods: bool = False
+    correction_method: str = 'bonferroni'  # 'bonferroni', 'holm', 'fdr_bh'
+    post_hoc_tests: bool = True
+
+@dataclass
 class OutputConfig:
     """Output configuration."""
     create_report: bool = True
@@ -212,6 +228,7 @@ class Config:
         self.data = DataConfig()
         self.visualization = VisualizationConfig()
         self.output = OutputConfig()
+        self.analysis = AnalysisConfig()
         
         if config_file and os.path.exists(config_file):
             self.load_from_file(config_file)
@@ -235,6 +252,8 @@ class Config:
                 self._update_config(self.visualization, config_data['visualization'])
             if 'output' in config_data:
                 self._update_config(self.output, config_data['output'])
+            if 'analysis' in config_data:
+                self._update_config(self.analysis, config_data['analysis'])
                 
         except Exception as e:
             print(f"Warning: Could not load configuration file {config_file}: {e}")
@@ -249,7 +268,8 @@ class Config:
             'statistical': self._config_to_dict(self.statistical),
             'data': self._config_to_dict(self.data),
             'visualization': self._config_to_dict(self.visualization),
-            'output': self._config_to_dict(self.output)
+            'output': self._config_to_dict(self.output),
+            'analysis': self._config_to_dict(self.analysis)
         }
         
         # Create directory if it doesn't exist
@@ -349,6 +369,7 @@ class Config:
         self.data = DataConfig()
         self.visualization = VisualizationConfig()
         self.output = OutputConfig()
+        self.analysis = AnalysisConfig()
 
 
 # Global default configuration instance

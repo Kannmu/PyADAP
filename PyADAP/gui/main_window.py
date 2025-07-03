@@ -6,15 +6,14 @@ and comprehensive functionality for data analysis.
 
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict, Any, List
 import threading
 from datetime import datetime
 
-from ..core import DataManager, StatisticalAnalyzer, AnalysisPipeline
+from ..core import DataManager, AnalysisPipeline
 from ..config import Config
-from ..utils import Logger, get_logger
+from ..utils import get_logger
 from .config_dialog import ConfigDialog
 from .data_preview import DataPreviewWidget
 from .analysis_wizard import AnalysisWizard
@@ -66,6 +65,7 @@ class MainWindow:
         self.data_manager = None
         self.pipeline = None
         self.current_data = None
+        self.current_data_file = None  # Store current data file path
         self.analysis_results = None
         
         # Create main window
@@ -116,7 +116,7 @@ class MainWindow:
         # Analysis menu
         analysis_menu = tk.Menu(menubar, tearoff=0)
         menubar.add_cascade(label="Analysis", menu=analysis_menu)
-        analysis_menu.add_command(label="Run Analysis Wizard...", command=self._run_analysis_wizard)
+        analysis_menu.add_command(label="Run Analysis Wizard...", command=self._open_analysis_wizard)
         analysis_menu.add_command(label="Quick Analysis", command=self._quick_analysis)
         analysis_menu.add_separator()
         analysis_menu.add_command(label="Data Quality Report", command=self._generate_quality_report)
@@ -155,7 +155,7 @@ class MainWindow:
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
         
         # Analysis operations
-        ttk.Button(toolbar_frame, text="🔍 Analysis Wizard", command=self._run_analysis_wizard).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar_frame, text="🔍 Analysis Wizard", command=self._open_analysis_wizard).pack(side=tk.LEFT, padx=2)
         ttk.Button(toolbar_frame, text="⚡ Quick Analysis", command=self._quick_analysis).pack(side=tk.LEFT, padx=2)
         
         ttk.Separator(toolbar_frame, orient=tk.VERTICAL).pack(side=tk.LEFT, fill=tk.Y, padx=5)
@@ -405,6 +405,9 @@ class MainWindow:
             # Load data
             self.current_data = self.data_manager.load_data(filename)
             
+            # Store the data file path
+            self.current_data_file = filename
+            
             # Update UI
             self._update_data_info()
             self._update_variable_lists()
@@ -421,6 +424,7 @@ class MainWindow:
             
             # Reset data state and update UI
             self.current_data = None
+            self.current_data_file = None
             self._update_ui_state()
     
     def _update_data_info(self) -> None:
@@ -551,8 +555,8 @@ class MainWindow:
                 config=self.config
             )
             
-            # Set data first
-            self.pipeline.set_data(self.current_data)
+            # Set data first with file path
+            self.pipeline.set_data(self.current_data, self.current_data_file)
             
             # Set variables
             self.pipeline.set_variables(
@@ -597,11 +601,84 @@ class MainWindow:
         # Display results
         self._display_results()
         
+        # Update visualization tab
+        self._update_visualization()
+        
         # Switch to results tab
         self.notebook.select(self.results_tab)
         
         self._update_status("Analysis completed")
         self.logger.info("Analysis completed successfully")
+    
+    def _update_visualization(self) -> None:
+        """Update the visualization tab with plots from analysis results."""
+        # Clear existing content
+        for widget in self.viz_tab.winfo_children():
+            widget.destroy()
+        
+        if self.analysis_results is None or 'plots' not in self.analysis_results or not self.analysis_results['plots']:
+            viz_label = ttk.Label(self.viz_tab, text="No visualizations available")
+            viz_label.pack(expand=True)
+            self.logger.warning("No plots available in analysis results")
+            return
+        
+        # Create a frame for the plot selection
+        control_frame = ttk.Frame(self.viz_tab)
+        control_frame.pack(fill=tk.X, padx=5, pady=5)
+        
+        # Add plot selection combo
+        ttk.Label(control_frame, text="Select Plot:").pack(side=tk.LEFT, padx=5)
+        plot_names = list(self.analysis_results['plots'].keys())
+        
+        if not plot_names:
+            viz_label = ttk.Label(self.viz_tab, text="No plots generated")
+            viz_label.pack(expand=True)
+            self.logger.warning("Plot dictionary is empty")
+            return
+            
+        plot_var = tk.StringVar(value=plot_names[0])
+        plot_combo = ttk.Combobox(control_frame, textvariable=plot_var, values=plot_names, state="readonly")
+        plot_combo.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=5)
+        
+        # Create a frame for the plot
+        plot_frame = ttk.Frame(self.viz_tab)
+        plot_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+        
+        def display_plot(*args):
+            try:
+                # Clear existing plot
+                for widget in plot_frame.winfo_children():
+                    widget.destroy()
+                
+                plot_name = plot_var.get()
+                if plot_name and plot_name in self.analysis_results['plots']:
+                    plot_data = self.analysis_results['plots'][plot_name]
+                    
+                    if plot_data is None:
+                        self.logger.warning(f"Plot data is None for {plot_name}")
+                        return
+                    
+                    # Create canvas
+                    canvas = FigureCanvasTkAgg(plot_data, plot_frame)
+                    canvas.draw()
+                    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+                    
+                    # Add toolbar
+                    from matplotlib.backends.backend_tkagg import NavigationToolbar2Tk
+                    toolbar = NavigationToolbar2Tk(canvas, plot_frame)
+                    toolbar.update()
+                    
+                    self.logger.info(f"Successfully displayed plot: {plot_name}")
+            except Exception as e:
+                self.logger.error(f"Error displaying plot {plot_name}: {str(e)}")
+                error_label = ttk.Label(plot_frame, text=f"Error displaying plot: {str(e)}")
+                error_label.pack(expand=True)
+        
+        # Bind plot selection change
+        plot_combo.bind('<<ComboboxSelected>>', display_plot)
+        
+        # Display initial plot
+        display_plot()
     
     def _analysis_failed(self, error_msg: str) -> None:
         """Handle analysis failure.
@@ -751,13 +828,13 @@ class MainWindow:
             self.logger.info("Configuration reset to defaults")
             messagebox.showinfo("Success", "Configuration reset successfully.")
     
-    def _run_analysis_wizard(self) -> None:
+    def _open_analysis_wizard(self) -> None:
         """Open analysis wizard."""
         if self.current_data is None:
             messagebox.showwarning("Warning", "Please load data first.")
             return
         
-        wizard = AnalysisWizard(self.root, self.current_data)
+        wizard = AnalysisWizard(self.root, self.config, self.current_data)
         if wizard.result:
             # Apply wizard results
             self.logger.info("Analysis wizard completed")
@@ -825,7 +902,7 @@ class MainWindow:
             )
             
             # Set data first
-            self.pipeline.set_data(self.current_data)
+            self.pipeline.set_data(self.current_data, self.current_data_file)
             
             # Set variables
             self.pipeline.set_variables(
@@ -946,7 +1023,7 @@ A comprehensive statistical analysis tool with modern GUI
 and automated analysis capabilities.
 
 Version: 3.0.0
-Author: PyADAP Development Team
+Author: Kannmu
 License: MIT"""
         
         messagebox.showinfo("About PyADAP", about_text)

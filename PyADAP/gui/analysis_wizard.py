@@ -7,23 +7,23 @@ the statistical analysis process.
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
-from typing import Optional, Dict, Any, List, Callable
-from pathlib import Path
+from typing import Optional, Dict, Any, Callable
 
 from ..config import Config
 from ..core import DataManager, StatisticalAnalyzer, AnalysisPipeline
-from ..utils import Logger, get_logger
+from ..utils import get_logger
 
 
 class AnalysisWizard:
     """Step-by-step analysis wizard."""
     
-    def __init__(self, parent: tk.Tk, config: Config, on_complete: Optional[Callable] = None):
+    def __init__(self, parent: tk.Tk, config: Config, data: Optional[pd.DataFrame] = None, on_complete: Optional[Callable] = None):
         """Initialize the analysis wizard.
         
         Args:
             parent: Parent window
             config: Configuration object
+            data: Pre-loaded data (optional)
             on_complete: Callback function when analysis is complete
         """
         self.parent = parent
@@ -35,7 +35,7 @@ class AnalysisWizard:
         self.data_manager: Optional[DataManager] = None
         self.analyzer: Optional[StatisticalAnalyzer] = None
         self.pipeline: Optional[AnalysisPipeline] = None
-        self.data: Optional[pd.DataFrame] = None
+        self.data: Optional[pd.DataFrame] = data  # Use pre-loaded data if provided
         self.result: Optional[Dict[str, Any]] = None
         
         # Wizard state
@@ -150,6 +150,20 @@ class AnalysisWizard:
         progress_value = ((step_index + 1) / len(self.steps)) * 100
         self.progress['value'] = progress_value
         
+        # Clear references to widgets that will be destroyed
+        if hasattr(self, 'available_listbox'):
+            self.available_listbox = None
+        if hasattr(self, 'independent_listbox'):
+            self.independent_listbox = None
+        if hasattr(self, 'dependent_listbox'):
+            self.dependent_listbox = None
+        if hasattr(self, 'subject_listbox'):
+            self.subject_listbox = None
+        if hasattr(self, 'covariate_listbox'):
+            self.covariate_listbox = None
+        if hasattr(self, 'var_notebook'):
+            self.var_notebook = None
+        
         # Clear content frame
         for widget in self.content_frame.winfo_children():
             widget.destroy()
@@ -158,7 +172,7 @@ class AnalysisWizard:
         try:
             step_func()
         except Exception as e:
-            self.logger.error(f"Error creating step {step_index}: {str(e)}")
+            self.logger.error(f"Error creating step {step_index + 1}: {str(e)}")
             error_label = ttk.Label(self.content_frame, text=f"Error creating step: {str(e)}")
             error_label.pack(pady=20)
         
@@ -178,12 +192,53 @@ class AnalysisWizard:
         title_label = ttk.Label(self.content_frame, text="Load Your Data", font=('TkDefaultFont', 14, 'bold'))
         title_label.pack(pady=(0, 20))
         
-        # Instructions
-        instructions = (
-            "Select a data file to begin your analysis. PyADAP supports Excel, CSV, TSV, and other common formats.\n"
-            "Make sure your data is properly formatted with column headers in the first row."
-        )
-        ttk.Label(self.content_frame, text=instructions, wraplength=600).pack(pady=(0, 20))
+        # Check if data is already loaded
+        if self.data is not None:
+            # Data already loaded - show info and option to change
+            instructions = (
+                "Data has been loaded from the main window. You can proceed to the next step "
+                "or load a different dataset if needed."
+            )
+            ttk.Label(self.content_frame, text=instructions, wraplength=600).pack(pady=(0, 20))
+            
+            # Current data info
+            info_frame = ttk.LabelFrame(self.content_frame, text="Current Data")
+            info_frame.pack(fill=tk.X, pady=(0, 20))
+            
+            info_text = f"Shape: {self.data.shape[0]} rows × {self.data.shape[1]} columns\n"
+            info_text += f"Columns: {', '.join(self.data.columns[:5])}{'...' if len(self.data.columns) > 5 else ''}"
+            ttk.Label(info_frame, text=info_text, wraplength=600).pack(padx=10, pady=10)
+            
+            # Option to load different data
+            ttk.Button(info_frame, text="Load Different Data", command=self._show_file_selection).pack(pady=(0, 10))
+            
+        else:
+            # No data loaded - show file selection
+            instructions = (
+                "Select a data file to begin your analysis. PyADAP supports Excel, CSV, TSV, and other common formats.\n"
+                "Make sure your data is properly formatted with column headers in the first row."
+            )
+            ttk.Label(self.content_frame, text=instructions, wraplength=600).pack(pady=(0, 20))
+            self._show_file_selection()
+        
+        # Data preview frame
+        self.data_preview_frame = ttk.LabelFrame(self.content_frame, text="Data Preview")
+        self.data_preview_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Show preview if data exists
+        if self.data is not None:
+            self._update_data_preview()
+        else:
+            # Preview text
+            preview_text = ttk.Label(self.data_preview_frame, text="No data loaded", foreground="gray")
+            preview_text.pack(expand=True)
+    
+    def _show_file_selection(self) -> None:
+        """Show file selection interface."""
+        # Check if file selection frame already exists
+        for widget in self.content_frame.winfo_children():
+            if isinstance(widget, ttk.LabelFrame) and widget.cget('text') == 'Data File':
+                return  # File selection already shown
         
         # File selection frame
         file_frame = ttk.LabelFrame(self.content_frame, text="Data File")
@@ -193,17 +248,10 @@ class AnalysisWizard:
         path_frame = ttk.Frame(file_frame)
         path_frame.pack(fill=tk.X, padx=10, pady=10)
         
-        self.file_path_var = tk.StringVar()
+        if not hasattr(self, 'file_path_var'):
+            self.file_path_var = tk.StringVar()
         ttk.Entry(path_frame, textvariable=self.file_path_var, state="readonly").pack(side=tk.LEFT, fill=tk.X, expand=True)
         ttk.Button(path_frame, text="Browse...", command=self._browse_file).pack(side=tk.RIGHT, padx=(10, 0))
-        
-        # Data preview frame
-        self.data_preview_frame = ttk.LabelFrame(self.content_frame, text="Data Preview")
-        self.data_preview_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Preview text
-        preview_text = ttk.Label(self.data_preview_frame, text="No data loaded", foreground="gray")
-        preview_text.pack(expand=True)
     
     def _create_variables_step(self) -> None:
         """Create the variable selection step."""
@@ -473,47 +521,85 @@ class AnalysisWizard:
         
         # Variables
         self.review_text.insert(tk.END, "Variables:\n")
-        if hasattr(self, 'independent_listbox'):
-            independent_vars = list(self.independent_listbox.get(0, tk.END))
-            dependent_vars = list(self.dependent_listbox.get(0, tk.END))
-            subject_vars = list(self.subject_listbox.get(0, tk.END))
-            covariate_vars = list(self.covariate_listbox.get(0, tk.END))
-            
-            self.review_text.insert(tk.END, f"  Independent: {', '.join(independent_vars) if independent_vars else 'None'}\n")
-            self.review_text.insert(tk.END, f"  Dependent: {', '.join(dependent_vars) if dependent_vars else 'None'}\n")
-            self.review_text.insert(tk.END, f"  Subject ID: {', '.join(subject_vars) if subject_vars else 'None'}\n")
-            self.review_text.insert(tk.END, f"  Covariates: {', '.join(covariate_vars) if covariate_vars else 'None'}\n\n")
+        if (hasattr(self, 'independent_listbox') and self.independent_listbox is not None and 
+            hasattr(self, 'dependent_listbox') and self.dependent_listbox is not None and
+            hasattr(self, 'subject_listbox') and self.subject_listbox is not None and
+            hasattr(self, 'covariate_listbox') and self.covariate_listbox is not None):
+            try:
+                if (self.independent_listbox.winfo_exists() and self.dependent_listbox.winfo_exists() and
+                    self.subject_listbox.winfo_exists() and self.covariate_listbox.winfo_exists()):
+                    independent_vars = list(self.independent_listbox.get(0, tk.END))
+                    dependent_vars = list(self.dependent_listbox.get(0, tk.END))
+                    subject_vars = list(self.subject_listbox.get(0, tk.END))
+                    covariate_vars = list(self.covariate_listbox.get(0, tk.END))
+                    
+                    self.review_text.insert(tk.END, f"  Independent: {', '.join(independent_vars) if independent_vars else 'None'}\n")
+                    self.review_text.insert(tk.END, f"  Dependent: {', '.join(dependent_vars) if dependent_vars else 'None'}\n")
+                    self.review_text.insert(tk.END, f"  Subject ID: {', '.join(subject_vars) if subject_vars else 'None'}\n")
+                    self.review_text.insert(tk.END, f"  Covariates: {', '.join(covariate_vars) if covariate_vars else 'None'}\n\n")
+                else:
+                    self.review_text.insert(tk.END, "  Variables not yet configured\n\n")
+            except tk.TclError:
+                self.review_text.insert(tk.END, "  Variables not yet configured\n\n")
+        else:
+            self.review_text.insert(tk.END, "  Variables not yet configured\n\n")
         
         # Preprocessing options
         self.review_text.insert(tk.END, "Preprocessing:\n")
-        if hasattr(self, 'missing_strategy_var'):
-            self.review_text.insert(tk.END, f"  Missing data: {self.missing_strategy_var.get()}\n")
-            self.review_text.insert(tk.END, f"  Outlier detection: {'Yes' if self.detect_outliers_var.get() else 'No'}\n")
-            if self.detect_outliers_var.get():
-                self.review_text.insert(tk.END, f"  Outlier method: {self.outlier_method_var.get()}\n")
-            self.review_text.insert(tk.END, f"  Auto transformation: {'Yes' if self.auto_transform_var.get() else 'No'}\n")
-            if not self.auto_transform_var.get():
-                self.review_text.insert(tk.END, f"  Transform method: {self.transform_method_var.get()}\n")
-            self.review_text.insert(tk.END, f"  Auto scaling: {'Yes' if self.auto_scaling_var.get() else 'No'}\n")
-            if not self.auto_scaling_var.get():
-                self.review_text.insert(tk.END, f"  Scaling method: {self.scaling_method_var.get()}\n")
+        if (hasattr(self, 'missing_strategy_var') and self.missing_strategy_var is not None and
+            hasattr(self, 'detect_outliers_var') and self.detect_outliers_var is not None and
+            hasattr(self, 'outlier_method_var') and self.outlier_method_var is not None and
+            hasattr(self, 'auto_transform_var') and self.auto_transform_var is not None and
+            hasattr(self, 'transform_method_var') and self.transform_method_var is not None and
+            hasattr(self, 'auto_scaling_var') and self.auto_scaling_var is not None and
+            hasattr(self, 'scaling_method_var') and self.scaling_method_var is not None):
+            try:
+                self.review_text.insert(tk.END, f"  Missing data: {self.missing_strategy_var.get()}\n")
+                self.review_text.insert(tk.END, f"  Outlier detection: {'Yes' if self.detect_outliers_var.get() else 'No'}\n")
+                if self.detect_outliers_var.get():
+                    self.review_text.insert(tk.END, f"  Outlier method: {self.outlier_method_var.get()}\n")
+                self.review_text.insert(tk.END, f"  Auto transformation: {'Yes' if self.auto_transform_var.get() else 'No'}\n")
+                if not self.auto_transform_var.get():
+                    self.review_text.insert(tk.END, f"  Transform method: {self.transform_method_var.get()}\n")
+                self.review_text.insert(tk.END, f"  Auto scaling: {'Yes' if self.auto_scaling_var.get() else 'No'}\n")
+                if not self.auto_scaling_var.get():
+                    self.review_text.insert(tk.END, f"  Scaling method: {self.scaling_method_var.get()}\n")
+            except (AttributeError, tk.TclError):
+                self.review_text.insert(tk.END, "  Preprocessing options not yet configured\n")
+        else:
+            self.review_text.insert(tk.END, "  Preprocessing options not yet configured\n")
         self.review_text.insert(tk.END, "\n")
         
         # Analysis options
         self.review_text.insert(tk.END, "Analysis Options:\n")
-        if hasattr(self, 'alpha_var'):
-            self.review_text.insert(tk.END, f"  Significance level: {self.alpha_var.get()}\n")
-            self.review_text.insert(tk.END, f"  Auto test selection: {'Yes' if self.auto_test_var.get() else 'No'}\n")
-            self.review_text.insert(tk.END, f"  Robust tests: {'Yes' if self.robust_tests_var.get() else 'No'}\n")
-            self.review_text.insert(tk.END, f"  Check normality: {'Yes' if self.check_normality_var.get() else 'No'}\n")
-            self.review_text.insert(tk.END, f"  Check homogeneity: {'Yes' if self.check_homogeneity_var.get() else 'No'}\n")
+        if (hasattr(self, 'alpha_var') and self.alpha_var is not None and
+            hasattr(self, 'auto_test_var') and self.auto_test_var is not None and
+            hasattr(self, 'robust_tests_var') and self.robust_tests_var is not None and
+            hasattr(self, 'check_normality_var') and self.check_normality_var is not None and
+            hasattr(self, 'check_homogeneity_var') and self.check_homogeneity_var is not None):
+            try:
+                self.review_text.insert(tk.END, f"  Significance level: {self.alpha_var.get()}\n")
+                self.review_text.insert(tk.END, f"  Auto test selection: {'Yes' if self.auto_test_var.get() else 'No'}\n")
+                self.review_text.insert(tk.END, f"  Robust tests: {'Yes' if self.robust_tests_var.get() else 'No'}\n")
+                self.review_text.insert(tk.END, f"  Check normality: {'Yes' if self.check_normality_var.get() else 'No'}\n")
+                self.review_text.insert(tk.END, f"  Check homogeneity: {'Yes' if self.check_homogeneity_var.get() else 'No'}\n")
+            except (AttributeError, tk.TclError):
+                self.review_text.insert(tk.END, "  Analysis options not yet configured\n")
+        else:
+            self.review_text.insert(tk.END, "  Analysis options not yet configured\n")
         self.review_text.insert(tk.END, "\n")
         
         # Output options
         self.review_text.insert(tk.END, "Output Options:\n")
-        if hasattr(self, 'save_plots_var'):
-            self.review_text.insert(tk.END, f"  Save plots: {'Yes' if self.save_plots_var.get() else 'No'}\n")
-            self.review_text.insert(tk.END, f"  Export to Excel: {'Yes' if self.export_excel_var.get() else 'No'}\n")
+        if (hasattr(self, 'save_plots_var') and self.save_plots_var is not None and
+            hasattr(self, 'export_excel_var') and self.export_excel_var is not None):
+            try:
+                self.review_text.insert(tk.END, f"  Save plots: {'Yes' if self.save_plots_var.get() else 'No'}\n")
+                self.review_text.insert(tk.END, f"  Export to Excel: {'Yes' if self.export_excel_var.get() else 'No'}\n")
+            except (AttributeError, tk.TclError):
+                self.review_text.insert(tk.END, "  Output options not yet configured\n")
+        else:
+            self.review_text.insert(tk.END, "  Output options not yet configured\n")
         
         self.review_text.config(state=tk.DISABLED)
     
@@ -585,7 +671,7 @@ class AnalysisWizard:
                 rows, cols = self.data.shape
                 info_text = f"Loaded: {rows:,} rows × {cols} columns"
                 if cols > 10:
-                    info_text += f" (showing first 10 columns)"
+                    info_text += " (showing first 10 columns)"
                 
                 info_label = ttk.Label(self.data_preview_frame, text=info_text, foreground="green")
                 info_label.pack(pady=5)
@@ -602,37 +688,144 @@ class AnalysisWizard:
             
             self.status_var.set("Error loading data")
     
+    def _update_data_preview(self) -> None:
+        """Update the data preview with current data."""
+        # Clear existing preview
+        for widget in self.data_preview_frame.winfo_children():
+            widget.destroy()
+        
+        if self.data is None:
+            preview_text = ttk.Label(self.data_preview_frame, text="No data loaded", foreground="gray")
+            preview_text.pack(expand=True)
+            return
+        
+        try:
+            # Create treeview for data preview
+            tree_frame = ttk.Frame(self.data_preview_frame)
+            tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
+            
+            # Show first 10 columns to avoid overcrowding
+            display_cols = list(self.data.columns[:10])
+            
+            preview_tree = ttk.Treeview(tree_frame, columns=display_cols, show='headings', height=8)
+            
+            # Configure columns
+            for col in display_cols:
+                preview_tree.heading(col, text=col)
+                preview_tree.column(col, width=100, minwidth=50)
+            
+            # Add data rows (first 10)
+            for idx, (_, row) in enumerate(self.data.head(10).iterrows()):
+                values = [str(row[col])[:20] for col in display_cols]  # Truncate long values
+                preview_tree.insert("", tk.END, values=values)
+            
+            preview_tree.pack(fill=tk.BOTH, expand=True)
+            
+            # Add scrollbar
+            scrollbar = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=preview_tree.yview)
+            preview_tree.configure(yscrollcommand=scrollbar.set)
+            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+            
+            # Show data info
+            rows, cols = self.data.shape
+            info_text = f"Loaded: {rows:,} rows × {cols} columns"
+            if cols > 10:
+                info_text += " (showing first 10 columns)"
+            
+            info_label = ttk.Label(self.data_preview_frame, text=info_text, foreground="green")
+            info_label.pack(pady=5)
+            
+        except Exception as e:
+            error_msg = f"Error displaying data preview: {str(e)}"
+            self.logger.error(error_msg)
+            
+            error_label = ttk.Label(self.data_preview_frame, text=error_msg, foreground="red")
+            error_label.pack(pady=20)
+    
     def _assign_variable(self, var_type: str) -> None:
         """Assign selected variables to a type.
         
         Args:
             var_type: Type of variable ('independent', 'dependent', 'subject', 'covariate')
         """
+        # Check if widgets exist and are valid
+        if not hasattr(self, 'available_listbox') or self.available_listbox is None:
+            return
+        
+        try:
+            if not self.available_listbox.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
         selected_indices = self.available_listbox.curselection()
         if not selected_indices:
             return
         
         # Get target listbox
-        target_listbox = getattr(self, f"{var_type}_listbox")
+        target_listbox_name = f"{var_type}_listbox"
+        if not hasattr(self, target_listbox_name):
+            return
+        
+        target_listbox = getattr(self, target_listbox_name)
+        if target_listbox is None:
+            return
+        
+        try:
+            if not target_listbox.winfo_exists():
+                return
+        except tk.TclError:
+            return
         
         # Move variables
-        for idx in reversed(selected_indices):  # Reverse to maintain indices
-            var_name = self.available_listbox.get(idx)
-            target_listbox.insert(tk.END, var_name)
-            self.available_listbox.delete(idx)
+        try:
+            for idx in reversed(selected_indices):  # Reverse to maintain indices
+                var_name = self.available_listbox.get(idx)
+                target_listbox.insert(tk.END, var_name)
+                self.available_listbox.delete(idx)
+        except tk.TclError:
+            # Widgets may have been destroyed during operation
+            pass
     
     def _remove_variable(self) -> None:
         """Remove variable from assigned lists back to available."""
-        # Check all assigned listboxes
-        listboxes = [self.independent_listbox, self.dependent_listbox, 
-                    self.subject_listbox, self.covariate_listbox]
+        # Check if available listbox exists
+        if not hasattr(self, 'available_listbox') or self.available_listbox is None:
+            return
         
-        for listbox in listboxes:
-            selected_indices = listbox.curselection()
-            for idx in reversed(selected_indices):
-                var_name = listbox.get(idx)
-                self.available_listbox.insert(tk.END, var_name)
-                listbox.delete(idx)
+        try:
+            if not self.available_listbox.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        
+        # Check all assigned listboxes
+        listbox_names = ['independent_listbox', 'dependent_listbox', 
+                        'subject_listbox', 'covariate_listbox']
+        
+        for listbox_name in listbox_names:
+            if not hasattr(self, listbox_name):
+                continue
+            
+            listbox = getattr(self, listbox_name)
+            if listbox is None:
+                continue
+            
+            try:
+                if not listbox.winfo_exists():
+                    continue
+            except tk.TclError:
+                continue
+            
+            try:
+                selected_indices = listbox.curselection()
+                for idx in reversed(selected_indices):
+                    var_name = listbox.get(idx)
+                    self.available_listbox.insert(tk.END, var_name)
+                    listbox.delete(idx)
+            except tk.TclError:
+                # Widget may have been destroyed during operation
+                continue
     
     def _validate_step(self) -> bool:
         """Validate current step.
@@ -646,10 +839,16 @@ class AnalysisWizard:
                 return False
         
         elif self.current_step == 1:  # Variable selection
-            if not hasattr(self, 'dependent_listbox'):
+            if not hasattr(self, 'dependent_listbox') or self.dependent_listbox is None:
                 return True  # Skip validation if widgets not created
             
-            dependent_vars = list(self.dependent_listbox.get(0, tk.END))
+            try:
+                if not self.dependent_listbox.winfo_exists():
+                    return True  # Skip validation if widget destroyed
+                dependent_vars = list(self.dependent_listbox.get(0, tk.END))
+            except tk.TclError:
+                return True  # Skip validation if widget access fails
+            
             if not dependent_vars:
                 messagebox.showerror("Error", "Please select at least one dependent variable.")
                 return False
@@ -677,13 +876,22 @@ class AnalysisWizard:
             # Update configuration with wizard settings
             self._update_config()
             
-            # Prepare variable assignments
+            # Prepare variable assignments - get data before destroying widgets
             variable_assignments = {}
-            if hasattr(self, 'independent_listbox'):
-                variable_assignments['independent'] = list(self.independent_listbox.get(0, tk.END))
-                variable_assignments['dependent'] = list(self.dependent_listbox.get(0, tk.END))
-                variable_assignments['subject'] = list(self.subject_listbox.get(0, tk.END))
-                variable_assignments['covariates'] = list(self.covariate_listbox.get(0, tk.END))
+            if hasattr(self, 'independent_listbox') and self.independent_listbox.winfo_exists():
+                try:
+                    variable_assignments['independent'] = list(self.independent_listbox.get(0, tk.END))
+                    variable_assignments['dependent'] = list(self.dependent_listbox.get(0, tk.END))
+                    variable_assignments['subject'] = list(self.subject_listbox.get(0, tk.END))
+                    variable_assignments['covariates'] = list(self.covariate_listbox.get(0, tk.END))
+                except tk.TclError:
+                    # Widgets may have been destroyed, use empty lists
+                    variable_assignments = {
+                        'independent': [],
+                        'dependent': [],
+                        'subject': [],
+                        'covariates': []
+                    }
             
             # Set result
             self.result = {
@@ -693,12 +901,16 @@ class AnalysisWizard:
                 'variables': variable_assignments
             }
             
+            # Store callback and result before destroying
+            callback = self.on_complete
+            result = self.result
+            
             # Close wizard
             self.wizard.destroy()
             
-            # Call completion callback
-            if self.on_complete:
-                self.on_complete(self.result)
+            # Call completion callback after destroying
+            if callback:
+                callback(result)
             
             self.logger.info("Analysis wizard completed successfully")
         

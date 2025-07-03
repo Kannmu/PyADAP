@@ -4,9 +4,8 @@ This module provides functionality for exporting analysis results
 and processed data in various formats.
 """
 
-import os
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Union
+from typing import Dict, List, Optional, Any
 from datetime import datetime
 import pandas as pd
 import json
@@ -27,10 +26,7 @@ class DataExporter:
         self.logger = get_logger("PyADAP.DataExporter")
         
         # Export settings
-        self.output_dir = Path(self.config.output_dir if hasattr(self.config, 'output_dir') else "./exports")
-        
-        # Ensure output directory exists
-        self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.output_dir = Path(self.config.output_dir) if hasattr(self.config, 'output_dir') else None
         
         self.logger.info("DataExporter initialized")
     
@@ -51,10 +47,16 @@ class DataExporter:
             Path to the exported file
         """
         try:
+            # Check if output directory is configured
+            if self.output_dir is None:
+                raise ValueError("No output directory configured. Please set output_dir in config.")
+            
             # Add appropriate extension if not present
             if not any(filename.endswith(ext) for ext in ['.csv', '.xlsx', '.json', '.parquet']):
                 filename = f"{filename}.{format_type}"
             
+            # Ensure output directory exists
+            self.output_dir.mkdir(parents=True, exist_ok=True)
             output_path = self.output_dir / filename
             
             if format_type.lower() == "csv":
@@ -90,10 +92,16 @@ class DataExporter:
             Path to the exported file
         """
         try:
+            # Check if output directory is configured
+            if self.output_dir is None:
+                raise ValueError("No output directory configured. Please set output_dir in config.")
+            
             if filename is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 filename = f"analysis_results_{timestamp}.{format_type}"
             
+            # Ensure output directory exists
+            self.output_dir.mkdir(parents=True, exist_ok=True)
             output_path = self.output_dir / filename
             
             if format_type.lower() == "json":
@@ -207,6 +215,13 @@ class DataExporter:
         Returns:
             Path to the manifest file
         """
+        # Check if output directory is configured
+        if self.output_dir is None:
+            raise ValueError("No output directory configured. Please set output_dir in config.")
+        
+        # Ensure output directory exists
+        self.output_dir.mkdir(parents=True, exist_ok=True)
+        
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         manifest_path = self.output_dir / f"export_manifest_{timestamp}.json"
         
